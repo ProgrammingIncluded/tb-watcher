@@ -3,6 +3,8 @@
 Birdwatch snapshots a profile page when given a URL or an exported list of `following` from the official Twitter exporter.
 This script is purely for the purposes of archival use-only.
 
+**Note, without logging in, you can only fetch a few posts from the profile.**
+
 ## Usage
 
 ```bash

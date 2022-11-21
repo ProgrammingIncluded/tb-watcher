@@ -6,7 +6,8 @@
 * Better pop-up removal support
 * Add `--url` support for single profile scraping
 * Add folder renaming to username functionality
-* Add `--disable-folder-rename` incase folder renaming fails
+* Add tweet without login limit check
+* Add faster scrolling for centering content
 
 ## 0.1.0: Initial Release
 

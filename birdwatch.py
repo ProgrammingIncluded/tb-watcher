@@ -5,6 +5,8 @@ Many thanks to: https://www.scrapingbee.com/blog/web-scraping-twitter/
 for the inspiration.
 
 Major adjustments to make UX a lot smoother.
+
+By: ProgrammingIncluded
 """
 import re
 import os
@@ -19,6 +21,7 @@ import time
 from random import randint
 from dataclasses import dataclass
 
+import selenium
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -28,6 +31,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import WebDriverException
 
 SCRAPE_N_TWEETS = 20
+IS_DEBUG = False
 
 @dataclass(init=True, repr=True, unsafe_hash=True)
 class Tweet:
@@ -42,11 +46,15 @@ class Tweet:
     reply_count: str
     potential_boost: bool
 
+def print_debug(text):
+    if IS_DEBUG:
+        print(text)
+
 def ensures_or(f, otherwise="NULL"):
     try:
         return f()
     except Exception as e:
-        print("Could not obtain using {} instead. Error: {}".format(otherwise, str(e)))
+        print_debug("Could not obtain using {} instead. Error: {}".format(otherwise, str(e)))
 
     return otherwise
 
@@ -62,13 +70,6 @@ def remove_elements(driver, elements):
     """.format(",".join(elements)))
 
 def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
-    if not force and os.path.exists(fpath):
-        return
-    elif force:
-        shutil.rmtree(fpath)
-
-    os.makedirs(fpath)
-
     driver.get(url)
     state = ""
     while state != "complete":
@@ -76,11 +77,8 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
         time.sleep(randint(3, 5))
         state = driver.execute_script("return document.readyState")
 
-    try:
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, '[data-testid="tweet"]')))
-    except WebDriverException:
-        print("Tweets did not appear!, Try setting headless=False to see what is happening")
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+        (By.CSS_SELECTOR, '[data-testid="tweet"]')))
 
     # Remove initial popups.
     remove_elements(driver, ["sheetDialog", "mask"])
@@ -96,6 +94,22 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
     metadata["join_date"] = ensures_or(driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserJoinDate"]').text)
     metadata["following"] = ensures_or(driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
     metadata["followers"] = ensures_or(driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
+
+    if metadata.get("username", "NULL") == "NULL":
+        raise RuntimeError("Fatal error, unable to resolve username {}".format(metadata))
+
+    # Change the fpath and resolve username
+    username = metadata["username"]
+    username = username[1:] if username.startswith("@") else username
+
+    fpath = os.path.join(fpath, username) 
+    if not force and os.path.exists(fpath):
+        print("Folder already exists, skipping: {}".format(fpath))
+        return
+    elif force:
+        shutil.rmtree(fpath)
+
+    os.makedirs(fpath)
 
     # Force utf-8
     # Save a copy of the metadata
@@ -138,7 +152,6 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
             for tweet in tweets:
                 # Try to scroll there first.
                 driver.execute_script("return arguments[0].scrollIntoView();", tweet)
-                time.sleep(1)
                 driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
 
                 tm = {"id": id_tracker}
@@ -187,17 +200,14 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
                     break
     
             # Scroll!
-            # Scroll down to bottom
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    
-            # Wait to load page
             time.sleep(randint(2, 4))
-    
-            # Calculate new scroll height and compare with last scroll height
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
                 break
             last_height = new_height
+    except selenium.common.exceptions.StaleElementReferenceException as e:
+        print("Tweet limit reached, for {} unable to fetch more data. Authentication is required.".format(username))
     except Exception as e:
         raise e
     finally:
@@ -210,7 +220,7 @@ def parse_args():
     parser.add_argument("--force", "-f", help="Force re-download everything. WARNING, will delete outputs.", action="store_true")
     parser.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=SCRAPE_N_TWEETS)
     parser.add_argument("--bio-only", "-b", help="Only store bio, no snapshots or tweets.", action="store_true")
-    parser.add_argument("--disable-folder-rename", help="Disable the extra post-processing where folders are renamed to user-names. Useful for permissions issues.", action="store_true")
+    parser.add_argument("--debug", help="Print debug output.", action="store_true")
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--input-json", "-i", help="Input json file", default="input.json")
@@ -219,6 +229,9 @@ def parse_args():
 
 def main():
     args = parse_args()
+    global IS_DEBUG
+    IS_DEBUG = args.debug
+
     output_folder = "snapshots"
     os.makedirs(output_folder, exist_ok=True)
 
@@ -227,8 +240,7 @@ def main():
     extra_args = {"force": args.force, "bio_only": args.bio_only}
     if args.url:
         path = urlp.urlparse(args.url).path
-        filename = os.path.split(path)[-1]
-        fetch_html(driver, args.url, fpath=os.path.join(output_folder, filename), **extra_args)
+        fetch_html(driver, args.url, fpath=output_folder, **extra_args)
     else:
         weird_opening = "window\..* = (\[[\S\s]*)"
         with open(args.input_json) as f:
@@ -241,31 +253,9 @@ def main():
     
         for d in data:
             account = d["following"]
-            fetch_html(driver, account["userLink"], fpath=os.path.join(output_folder, account["accountId"]), **extra_args)
+            fetch_html(driver, account["userLink"], fpath=output_folder, **extra_args)
 
-    if not args.disable_folder_rename:
-        all_folders = list(glob.glob(os.path.join(output_folder, "*")))
-        all_folder_names = [os.path.split(fpath)[-1] for fpath in all_folders]
-        for idx, fpath in enumerate(all_folders):
-            cur_folder_path, cur_folder_name = os.path.split(fpath)
-
-            # Check each metadata
-            username = None
-            with open(os.path.join(fpath, "metadata.json"), encoding="utf-8") as f:
-                d = json.load(f)
-                username = d["username"]
-
-            if username.startswith("@"):
-                username = username[1:]
-
-            if username == cur_folder_name:
-                print("Folder already properly named, skipping.")
-                continue
-            elif username in (all_folder_names[:idx] + all_folder_names[idx + 1:]):
-                print("Folder already exists with this user, adding extra uuid.")
-                username += str(uuid.uuid4())
-
-            os.rename(fpath, os.path.join(cur_folder_path, username))
+    print("ALL SCRAPING COMPLETED!")
 
 if __name__ == "__main__":
     main()
