@@ -27,7 +27,7 @@ This script is purely for the purposes of archival use only.
 
 ```bash
 # Install the requirements. Once only.
-python -m pip install -r requirements.py
+python -m pip install -r requirements.txt
 python birdwatch.py --url www.twitter.com/<profile>
 
 # For more help use:

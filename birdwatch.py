@@ -143,8 +143,11 @@ def calc_average(percentage):
 def window_average(window):
     def _func(lst):
         v = lst[:-min(window, len(lst))]
+        if len(v) == 0:
+            return lst[-1]
         return sum(v) / len(v)
     return _func
+
 
 def constant(const):
     def _func(lst):
