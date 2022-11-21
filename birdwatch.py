@@ -26,6 +26,59 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 
+LOGO = """
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,'''''''',,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,''',;;:;;:cllollllccc:;,'.',,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,'';:codxkkkkkkkkkkkkkkkkkkxocc:;',,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,;,'';coxkkkkkkkkkkkkkkkkkkkkkkkkkkkkxl:,',,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,'.,:dkkkkkkkkkkkkkkkkkxocdkkkkkkkkkkxdxxd:,',,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,'.';lxkkkkkkkkkolxkkkkkkkkl;:okkkkkkkkxxxddxxo;.',,,,,,,,,,,,,,,,,,
+,,,,,,,,'...,:cdxxxkkkkkkkkx;;xkkkkkkkko;cooxkkkkkkkxdocldxdl,',,,,,,,,,,,,,,,,,
+,,,,,,,,,. .',,;:oxkkkkkkkxl::dkkkkkkkko,cOkcdkxxxkkkxl;,;:lol:,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,''..:oxkkkkxdxkocl,:kkkkkxxkl,:ONklokxodkkkxc,;;;:coc,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,;oxkkkkkkolxx:dk::okkkkxxkl,cONNOccddcokkkl':lcccldc,,,,,,,,,,,,,,,
+,,,,,,,,,,,.:xkxxkkkkxllo:;kkodcoxkkxddc';ccll:..,,'lkkl,:lcclloo,',,,,,,,,,,,,,
+,,,,,,,,,'.,dxxxxkkkkdlxd,':;':c:oxkkc,,.;:,'....;. .cxc,lo:;cloo;.',,,,,,,,,,,,
+,,,,,,,,'.;ooldxxxkkkoll;;c:'.  ,l:cx:.'.;'     'Ox.':;;:oo:;ollol;',,,,,,,,,,,,
+,,,,,,,'..''''cxdxkkko,.lXx.    ;00xo:oKOx'     ;XO'lk:cooo;dNdcoodl,,,;,,,,,,,,
+,,,,,,,,''',,',oc;dkkl..kWo     ;XWWWXNWMNo    .xWOdOocoool;d0oloodxdc,',,,,,,,,
+,,,,,,,,,,,,,,',..;dkl..dWO.    lNMWWWWWWWXl..,dNWWXdcloooc,:lloooodxxdc'.,,,,,,
+,,,,,,,,,,,,,,;,.',,::coONNc   :KWWWWWWWWWWWXKKXNNXdcloooo;,looooooooddxd:.',,,,
+,,,,,,,,,,,,,,,;,.,;'.'kWWWKdokXWWWWNNWWWWWWWWNNNXd:looooc,;clooolcooo::ox:.,;,,
+,,,,,,,,,,,,,,,'.';;;.;0NXXNNWWWWWWWXNWWWWWWWWWXKd:looooc,:c,:doo;.,ll',oo;.,;,,
+,,,,,,,,,,,,''''',;:;..cxk0KXNNNNNXXNNNKOkxollcc,'cooooc,:oc.'odl'.',,.;o;.',,,,
+,,,,,,,,,,,...''.':c;';c;,,:ool:,,,;ldxl,',;,;lc';oool;;:c;...:l,.,;;'',,',,,,,,
+,,,,,,,,,,,,,,,,,',;',::,..,lc'.......;oddkXKd;..;l:,.',,'',;,''.'''...',,,,,,,,
+,,,,,,,,,,,,,,,,,,'...   ..,dxd:,.. .:xkkONWWWO;'clc'.......,;::cll.    .,,,,,,,
+,,,,,,,,,,,,,,,,,,.,ooc'...'O0:'...  ':okOXWWWWl;o;.    ....kOddo0K,    .,,,,,,,
+,,,,,,,,,,,,,,,,'.'xWX0Od, .d:.. ......;dk0kxOO'.'.     ...:xc,;;k0,     ',,,,,,
+,,,,,,,,,,,,,,,. ;xONWXOkl..d:.  ,::,. ,oodd,..    .     .xXX0O00XX;     .;,,,,,
+,,,,,,,,,,,,,,,. ;OOXWXk:'..dk,.  .. .,kXOOO,      .     .kWNWWWWWNc     .,,,,,,
+,,,,,,,,,,,,,,,. .xkOK0k, .'lOkc,'..;oO00xOK,      .      dWWWWWWNWd.    .,,,,,,
+,,,,,,,,,,,,,,,'. ;kkxxko.'xOOOOOOkOOOOOOdOK:. .;;..      :XWWWWNXKx.    .,,,,,,
+,,,,,,,,,,,,,,,,,..;odk00d,'d00KKKK0KKK0OkKKdxxoo, .      .;lccc:;,'....',,,,,,,
+,,,,,,,,,,,,,,,,,,;';oxkxxl..looooooooollll:'..   ''........''',,,;;,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,;,'',.                   ..lXO;,;,;,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,......         ...',,;xKo',,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,;;,,,,,''',,,,,,,,,,;;'',,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,;,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+"""
+TITLE = """
+ ____  _         _               _       _     
+|  _ \(_)       | |             | |     | |    
+| |_) |_ _ __ __| |_      ____ _| |_ ___| |__  
+|  _ <| | '__/ _` \ \ /\ / / _` | __/ __| '_ \ 
+| |_) | | | | (_| |\ V  V / (_| | || (__| | | |
+|____/|_|_|  \__,_| \_/\_/ \__,_|\__\___|_| |_|
+                                               
+"""
+
 SCRAPE_N_TWEETS = 20
 IS_DEBUG = False
 
@@ -77,13 +130,26 @@ def remove_elements(driver, elements, remove_parent=True):
     }}
     """.format(",".join(elements)))
 
-def calc_average(lst):
-    if len(lst) < 4:
-        return sum(lst) / len(lst)
+def calc_average(percentage):
+    def _func(lst):
+        if len(lst) < 4:
+            return sum(lst) / len(lst)
+    
+        cut_off = int(len(lst) * percentage)
+        s = sorted(lst)[cut_off:len(lst) - cut_off]
+        return sum(s) / len(s)
+    return _func
 
-    cut_off = int(len(lst) * 0.25)
-    s = sorted(lst)[cut_off:len(lst) - cut_off]
-    return sum(s) / len(s)
+def window_average(window):
+    def _func(lst):
+        v = lst[:-min(window, len(lst))]
+        return sum(v) / len(v)
+    return _func
+
+def constant(const):
+    def _func(lst):
+        return const
+    return _func
 
 def remove_ads(driver):
     return driver.execute_script("""
@@ -99,7 +165,7 @@ def remove_ads(driver):
     """)
 
 
-def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
+def fetch_html(driver, url, fpath, load_times, offset_func, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
     driver.get(url)
     state = ""
     while state != "complete":
@@ -253,7 +319,7 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
                     break
     
             # Scroll!
-            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + calc_average(height_diffs)))
+            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + offset_func(height_diffs)))
             time.sleep(random.uniform(load_times, load_times + 2))
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
@@ -277,8 +343,13 @@ def parse_args():
     parser.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=SCRAPE_N_TWEETS, type=int)
     parser.add_argument("--bio-only", "-b", help="Only store bio, no snapshots or tweets.", action="store_true")
     parser.add_argument("--debug", help="Print debug output.", action="store_true")
-    parser.add_argument("--login", help="Prompt user login to remove tweet limit..", action="store_true")
+    parser.add_argument("--login", help="Prompt user login to remove limits / default filters. USE AT OWN RISK.", action="store_true")
     parser.add_argument("--scroll-load-time", "-s", help="Number of seconds (float). The higher, the stabler the fetch.", default=5, type=int)
+    parser.add_argument("--scroll-algorithm", help="Type of algorithm to calculate scroll offset.", choices=["percentile", "window", "constant"], default="window")
+    parser.add_argument("--scroll-value", default=5, type=float, help=("Value used by --scroll-algorithm."
+                                                                        "If percentile, percentage of percentile calculated. "
+                                                                        "If window, the size of window average."
+                                                                        "If constant, size of pixel to scroll by."))
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--input-json", "-i", help="Input json file", default="input.json")
@@ -290,9 +361,22 @@ def main():
     global IS_DEBUG
     IS_DEBUG = args.debug
 
+    print(LOGO)
+    print(TITLE)
+
     output_folder = "snapshots"
     os.makedirs(output_folder, exist_ok=True)
     extra_args = {"force": args.force, "bio_only": args.bio_only, "load_times": args.scroll_load_time, "number_posts_to_cap": args.posts}
+    f = None
+    if args.scroll_algorithm == "percentile":
+        assert args.scroll_value <= 1.0 and args.scroll_value >= 0.0
+        f = calc_average(args.scroll_value)
+    elif args.scroll_algorithm == "window":
+        f = window_average(args.scroll_value)
+    else:
+        f = constant(args.scroll_value)
+
+    extra_args["offset_func"] = f
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
     if args.login:

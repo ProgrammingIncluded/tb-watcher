@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.3.1: User README Updates
+
+* Add example README
+* Update README
+* Add scroll algorithm selection
+
 ## 0.3.0: Remove Ads and Average Scrolling
 
 * Add average scrolling to compensate for scroll heights
