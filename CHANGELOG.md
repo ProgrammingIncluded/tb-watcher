@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.3.1: User README Updates
+## 0.4.0: More Algorithms
 
 * Add example README
 * Update README
