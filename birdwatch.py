@@ -9,6 +9,9 @@ Major adjustments to make UX a lot smoother.
 import re
 import os
 import json
+import uuid
+import glob
+import urllib.parse as urlp
 import argparse
 import shutil
 import time
@@ -25,7 +28,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import WebDriverException
 
 SCRAPE_N_TWEETS = 20
-
 
 @dataclass(init=True, repr=True, unsafe_hash=True)
 class Tweet:
@@ -116,9 +118,9 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
     last_id_count = 0
     tweets_tracker = set()
     boosted_tracker = set()
-    last_height = 0
-    new_height = 0
     try:
+        last_height = 0
+        new_height = 0
         while True:
             if id_tracker >= number_posts_to_cap - 1:
                 break
@@ -205,10 +207,14 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Process Twitter Account Metadata")
-    parser.add_argument("--input-json", "-i", help="Input json file", default="input.json")
     parser.add_argument("--force", "-f", help="Force re-download everything. WARNING, will delete outputs.", action="store_true")
     parser.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=SCRAPE_N_TWEETS)
     parser.add_argument("--bio-only", "-b", help="Only store bio, no snapshots or tweets.", action="store_true")
+    parser.add_argument("--disable-folder-rename", help="Disable the extra post-processing where folders are renamed to user-names. Useful for permissions issues.", action="store_true")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--input-json", "-i", help="Input json file", default="input.json")
+    group.add_argument("--url", "-u", help="Specify a profile url directly.")
     return parser.parse_args()
 
 def main():
@@ -217,19 +223,49 @@ def main():
     os.makedirs(output_folder, exist_ok=True)
 
     data = []
-    weird_opening = "window\..* = (\[[\S\s]*)"
-    with open(args.input_json) as f:
-        txt = f.read()
-        match = re.match(weird_opening, txt)
-        if match.group(1):
-            txt = match.group(1)
-        # Remove the first line metadata
-        data = json.loads(txt)
-
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-    for d in data:
-        account = d["following"]
-        fetch_html(driver, account["userLink"], fpath=os.path.join(output_folder, account["accountId"]), force=args.force, bio_only=args.bio_only)
+    extra_args = {"force": args.force, "bio_only": args.bio_only}
+    if args.url:
+        path = urlp.urlparse(args.url).path
+        filename = os.path.split(path)[-1]
+        fetch_html(driver, args.url, fpath=os.path.join(output_folder, filename), **extra_args)
+    else:
+        weird_opening = "window\..* = (\[[\S\s]*)"
+        with open(args.input_json) as f:
+            txt = f.read()
+            match = re.match(weird_opening, txt)
+            if match.group(1):
+                txt = match.group(1)
+            # Remove the first line metadata
+            data = json.loads(txt)
+    
+        for d in data:
+            account = d["following"]
+            fetch_html(driver, account["userLink"], fpath=os.path.join(output_folder, account["accountId"]), **extra_args)
+
+    if not args.disable_folder_rename:
+        all_folders = list(glob.glob(os.path.join(output_folder, "*")))
+        all_folder_names = [os.path.split(fpath)[-1] for fpath in all_folders]
+        for idx, fpath in enumerate(all_folders):
+            cur_folder_path, cur_folder_name = os.path.split(fpath)
+
+            # Check each metadata
+            username = None
+            with open(os.path.join(fpath, "metadata.json"), encoding="utf-8") as f:
+                d = json.load(f)
+                username = d["username"]
+
+            if username.startswith("@"):
+                username = username[1:]
+
+            if username == cur_folder_name:
+                print("Folder already properly named, skipping.")
+                continue
+            elif username in (all_folder_names[:idx] + all_folder_names[idx + 1:]):
+                print("Folder already exists with this user, adding extra uuid.")
+                username += str(uuid.uuid4())
+
+            os.rename(fpath, os.path.join(cur_folder_path, username))
 
 if __name__ == "__main__":
     main()
