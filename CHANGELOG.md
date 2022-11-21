@@ -4,6 +4,7 @@
 
 * Add average scrolling to compensate for scroll heights
 * Add Ad removal logic
+* Fix bug where post length was not respected
 
 ## 0.2.0: Enable Login and New Scroll Method
 
