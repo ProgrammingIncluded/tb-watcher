@@ -25,7 +25,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import WebDriverException
 
 SCRAPE_N_TWEETS = 20
 IS_DEBUG = False
@@ -77,6 +76,14 @@ def remove_elements(driver, elements, remove_parent=True):
             element.parentNode.removeChild(element);
     }}
     """.format(",".join(elements)))
+
+def calc_average(lst):
+    if len(lst) < 4:
+        return sum(lst) / len(lst)
+
+    cut_off = int(len(lst) * 0.25)
+    s = sorted(lst)[cut_off:len(lst) - cut_off]
+    return sum(s) / len(s)
 
 def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
     driver.get(url)
@@ -142,6 +149,7 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
     tweets_tracker = set()
     boosted_tracker = set()
     estimated_height = 0
+    height_diffs = []
     div_track = set()
     try:
         last_height = 0
@@ -178,6 +186,7 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
                 height = float(driver.execute_script("return window.scrollTop || window.pageYOffset;"))
                 if height < estimated_height:
                     continue
+                height_diffs.append(height - estimated_height)
                 estimated_height = height
 
                 tm = {"id": id_tracker}
@@ -226,8 +235,8 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
                     break
     
             # Scroll!
+            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + calc_average(height_diffs)))
             time.sleep(random.uniform(load_times, load_times + 2))
-            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + 10))
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
                 break
@@ -247,7 +256,7 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
 def parse_args():
     parser = argparse.ArgumentParser(description="Process Twitter Account Metadata")
     parser.add_argument("--force", "-f", help="Force re-download everything. WARNING, will delete outputs.", action="store_true")
-    parser.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=SCRAPE_N_TWEETS)
+    parser.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=SCRAPE_N_TWEETS, type=int)
     parser.add_argument("--bio-only", "-b", help="Only store bio, no snapshots or tweets.", action="store_true")
     parser.add_argument("--debug", help="Print debug output.", action="store_true")
     parser.add_argument("--login", help="Prompt user login to remove tweet limit..", action="store_true")
@@ -265,7 +274,7 @@ def main():
 
     output_folder = "snapshots"
     os.makedirs(output_folder, exist_ok=True)
-    extra_args = {"force": args.force, "bio_only": args.bio_only, "load_times": args.scroll_load_time}
+    extra_args = {"force": args.force, "bio_only": args.bio_only, "load_times": args.scroll_load_time, "number_posts_to_cap": args.posts}
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
     if args.login:
