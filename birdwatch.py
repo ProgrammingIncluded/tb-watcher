@@ -85,6 +85,20 @@ def calc_average(lst):
     s = sorted(lst)[cut_off:len(lst) - cut_off]
     return sum(s) / len(s)
 
+def remove_ads(driver):
+    return driver.execute_script("""
+        var elems = document.querySelectorAll("*"),
+            res = Array.from(elems).find(v => v.textContent == 'Promoted Tweet');
+
+        if (res) {
+            let p = res.parentNode.parentNode.parentNode;
+            p.innerHTML="";
+            return true;
+        }
+        return false;
+    """)
+
+
 def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
     driver.get(url)
     state = ""
@@ -180,6 +194,10 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
                     div_track.add(div_id)
                     driver.execute_script("return arguments[0].scrollIntoView();", tweet)
                     driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
+
+                    ad = remove_ads(driver)
+                    if ad:
+                        continue
                 except:
                     continue
 

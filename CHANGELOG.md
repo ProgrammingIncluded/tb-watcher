@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.3.0: Remove Ads and Average Scrolling
+
+* Add average scrolling to compensate for scroll heights
+* Add Ad removal logic
+
 ## 0.2.0: Enable Login and New Scroll Method
 
 * Add `--login` for giving users login
