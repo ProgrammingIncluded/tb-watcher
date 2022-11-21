@@ -34,6 +34,8 @@ python birdwatch.py --url www.twitter.com/<profile>
 python birdwatch.py --help
 ```
 
+Tested on Python 3.10.
+
 ### Output
 
 Birdwatch generates the following in the snapshots folder:
@@ -66,7 +68,7 @@ Assume all data is UTF-8 compliant.
 
 These files are what the Twitter exporter should generate (`.js` file) from the users you are following:
 
-```json
+```
 window.* = [
     {
         "following": {
@@ -82,7 +84,7 @@ You can rename as json or specify via input flags to parse the file. `window.* =
 
 ### tweets.json
 
-```json
+```
 [
     {
         "id": int,
@@ -103,7 +105,7 @@ Invalid string entries will be marked as "NULL".
 
 ###  metadata.json
 
-```json
+```
 {
     "bio": str,
     "name": str,
@@ -123,13 +125,13 @@ Invalid string entries will be marked as "NULL".
 
 * My scraper terminates early?
 
-It is possible that either your images are taking sometime to load Consider using `-s` to adjust load-time.
+It is possible that your images are taking sometime to load, Consider using `-s` to adjust load-time.
 Or your scrolling height is too low / too high. Consider using `--scroll-algorithm` to adjust the type of algorithm
 Then passing in a value to the algorithm `--scroll-value`.
 
-Help has more information as to what `--scroll-value` encodes.
+"--help" has more information as to what `--scroll-value` encodes.
 
-## Future Updates
+## Future Updates and Goals
 
-* Support Running Multiple Sessions to Resume Per-Profile
-* Expand Images and Attachments to Archive Images
+* Support Running Multiple Sessions to Resume Per-Profile Fetching
+* Save and Expand Post Attachments
