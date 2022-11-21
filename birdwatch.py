@@ -11,14 +11,11 @@ By: ProgrammingIncluded
 import re
 import os
 import json
-import uuid
-import glob
-import urllib.parse as urlp
+import random
 import argparse
 import shutil
 import time
 
-from random import randint
 from dataclasses import dataclass
 
 import selenium
@@ -58,8 +55,20 @@ def ensures_or(f, otherwise="NULL"):
 
     return otherwise
 
-def remove_elements(driver, elements):
+def remove_elements(driver, elements, remove_parent=True):
     elements = ["'{}'".format(v) for v in elements]
+    if remove_parent:
+        # Some weird elements are better removing parent to
+        # remove render artifacts.
+        driver.execute_script("""
+        const values = [{}];
+        for (let i = 0; i < values.length; ++i) {{
+            var element = document.querySelector(`[data-testid='${{values[i]}}']`);
+            if (element)
+                element.parentNode.parentNode.removeChild(element.parentNode);
+        }}
+        """.format(",".join(elements)))
+
     driver.execute_script("""
     const values = [{}];
     for (let i = 0; i < values.length; ++i) {{
@@ -69,19 +78,19 @@ def remove_elements(driver, elements):
     }}
     """.format(",".join(elements)))
 
-def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
+def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
     driver.get(url)
     state = ""
     while state != "complete":
         print("loading not complete")
-        time.sleep(randint(3, 5))
+        time.sleep(random.uniform(3, 5))
         state = driver.execute_script("return document.readyState")
 
-    WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+    WebDriverWait(driver, 30).until(EC.presence_of_element_located(
         (By.CSS_SELECTOR, '[data-testid="tweet"]')))
 
     # Remove initial popups.
-    remove_elements(driver, ["sheetDialog", "mask"])
+    remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
 
     # delete bottom element
     remove_elements(driver, ["BottomBar"])
@@ -132,9 +141,12 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
     last_id_count = 0
     tweets_tracker = set()
     boosted_tracker = set()
+    div_id_track = set()
+    estimated_height = 0
     try:
         last_height = 0
         new_height = 0
+        temp_load_times = load_times
         while True:
             if id_tracker >= number_posts_to_cap - 1:
                 break
@@ -150,16 +162,55 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
 
             tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
             for tweet in tweets:
-                # Try to scroll there first.
-                driver.execute_script("return arguments[0].scrollIntoView();", tweet)
-                driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
+                # Enables backwards scrolling and looking at existing divs.
+                if div_id and div_id in div_id_track:
+                    print("Div track is working??")
+                    continue
+                print("DIV: {}".format(div_id))
+                div_id_track.add(div_id)
+
+                # Try to scroll there first and retry 2x load times before giving up.
+                # Then bump up global load times by one.
+                scrolled = False
+                limit = temp_load_times + 3
+                for lt in range(temp_load_times, limit):
+                    try:
+                        driver.execute_script("return arguments[0].scrollIntoView();", tweet)
+                        driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
+                        time.sleep(1)
+                        scrolled = True
+                        # Reset load times
+                        temp_load_times = load_times
+                        break
+                    except selenium.common.exceptions.StaleElementReferenceException as e:
+                        if lt < limit - 1:
+                            print("Loading times are getting harder. Bumping wait time for next iteration.")
+                            print_debug("Load time: {}".format(lt))
+                            try:
+                                WebDriverWait(driver, 20).until(EC.presence_of_element_located(tweet))
+                                driver.execute_script("window.scrollTo(0, window.pageYOffset - 20);")
+                            except:
+                                pass
+                        elif temp_load_times >= load_times + 2:
+                            print("Even after bumping global load times, still failing. Aborting task.")
+                            raise e
+                        else:
+                            print("This tweet just ain't load'in. Bumping global load times to: {}".format(temp_load_times))
+                            # Scroll backwards.
+                            driver.execute_script("window.scrollTo(0, window.pageYOffset - 10);")
+                            time.sleep(lt)
+                            temp_load_times += 1
+                            break
+
+                if not scrolled:
+                    print("SKIPPING")
+                    break
 
                 tm = {"id": id_tracker}
                 tm["tag_text"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
                 try:
                     tm["name"], tm["handle"], _, tm["timestamp"] = ensures_or(lambda: tm["tag_text"].split('\n'), tuple(["UKNOWN" for _ in range(4)]))
                 except Exception as e:
-                    print("Unable to unpack name values. {}".format(e))
                     tm["name"], tm["handle"], tm["timestamp"] = tm["tag_text"], "ERR", "ERR"
     
                 tm["tweet_text"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="tweetText"]').text)
@@ -182,11 +233,14 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
 
                 dtm = Tweet(**tm)
                 if dtm in tweets_tracker:
+                    print("ARLEAD {}".format(dtm))
                     continue
-    
+
+                estimated_height += tweet.size["height"]
+
                 try:
                     # Try to remove elements before screenshot
-                    remove_elements(driver, ["sheetDialog", "mask"])
+                    remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
                     tweet.screenshot(os.path.join(tweets_path, "{}.png".format(id_tracker)))
                 except Exception as e:
                     # Failure to screenshot maybe because the tweet is too stale. Skip for now.
@@ -200,14 +254,17 @@ def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWE
                     break
     
             # Scroll!
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(randint(2, 4))
+            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + 100))
+            time.sleep(random.uniform(load_times, load_times + 2))
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
                 break
             last_height = new_height
     except selenium.common.exceptions.StaleElementReferenceException as e:
         print("Tweet limit reached, for {} unable to fetch more data. Authentication is required.".format(username))
+        print("Or you can try to bump loading times.")
+        input()
+        raise e
     except Exception as e:
         raise e
     finally:
@@ -221,6 +278,8 @@ def parse_args():
     parser.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=SCRAPE_N_TWEETS)
     parser.add_argument("--bio-only", "-b", help="Only store bio, no snapshots or tweets.", action="store_true")
     parser.add_argument("--debug", help="Print debug output.", action="store_true")
+    parser.add_argument("--login", help="Prompt user login to remove tweet limit..", action="store_true")
+    parser.add_argument("--scroll-load-time", "-s", help="Number of seconds (float). The higher, the stabler the fetch.", default=5, type=int)
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--input-json", "-i", help="Input json file", default="input.json")
@@ -234,12 +293,15 @@ def main():
 
     output_folder = "snapshots"
     os.makedirs(output_folder, exist_ok=True)
+    extra_args = {"force": args.force, "bio_only": args.bio_only, "load_times": args.scroll_load_time}
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    if args.login:
+        driver.get("https://twitter.com/login")
+        input("Please logging then press any key in CLI to continue...")
 
     data = []
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-    extra_args = {"force": args.force, "bio_only": args.bio_only}
     if args.url:
-        path = urlp.urlparse(args.url).path
         fetch_html(driver, args.url, fpath=output_folder, **extra_args)
     else:
         weird_opening = "window\..* = (\[[\S\s]*)"
