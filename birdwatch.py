@@ -163,6 +163,7 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
             tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
             for tweet in tweets:
                 # Enables backwards scrolling and looking at existing divs.
+                div_id = tweet.get_attribute("aria-labelledby") 
                 if div_id and div_id in div_id_track:
                     print("Div track is working??")
                     continue
