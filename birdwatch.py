@@ -1,6 +1,10 @@
 """
+Birdwatch snapshots a profile page when given a URL or an exported list of `following` from the official Twitter exporter.
+
 Many thanks to: https://www.scrapingbee.com/blog/web-scraping-twitter/
-With minor adjustments - ProgrammingIncluded
+for the inspiration.
+
+Major adjustments to make UX a lot smoother.
 """
 import re
 import os
@@ -22,7 +26,6 @@ from selenium.common.exceptions import WebDriverException
 
 SCRAPE_N_TWEETS = 20
 
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 
 @dataclass(init=True, repr=True, unsafe_hash=True)
 class Tweet:
@@ -56,7 +59,7 @@ def remove_elements(driver, elements):
     }}
     """.format(",".join(elements)))
 
-def fetch_html(url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
+def fetch_html(driver, url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio_only=False):
     if not force and os.path.exists(fpath):
         return
     elif force:
@@ -77,7 +80,8 @@ def fetch_html(url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio
     except WebDriverException:
         print("Tweets did not appear!, Try setting headless=False to see what is happening")
 
-    driver.find_element(By.XPATH, "/html/body/div[1]/div/div/div[1]/div[2]/div/div/div/div/div/div[2]/div[2]/div/div[2]/div[1]").click()
+    # Remove initial popups.
+    remove_elements(driver, ["sheetDialog", "mask"])
 
     # delete bottom element
     remove_elements(driver, ["BottomBar"])
@@ -91,7 +95,7 @@ def fetch_html(url, fpath, force=False, number_posts_to_cap=SCRAPE_N_TWEETS, bio
     metadata["following"] = ensures_or(driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
     metadata["followers"] = ensures_or(driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
 
-    # Force utf-16
+    # Force utf-8
     # Save a copy of the metadata
     with open(os.path.join(fpath, "metadata.json"), "w", encoding="utf-8") as f:
         json.dump(metadata, f, ensure_ascii=False)
@@ -222,9 +226,10 @@ def main():
         # Remove the first line metadata
         data = json.loads(txt)
 
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
     for d in data:
         account = d["following"]
-        fetch_html(account["userLink"], fpath=os.path.join(output_folder, account["accountId"]), force=args.force, bio_only=args.bio_only)
+        fetch_html(driver, account["userLink"], fpath=os.path.join(output_folder, account["accountId"]), force=args.force, bio_only=args.bio_only)
 
 if __name__ == "__main__":
     main()
