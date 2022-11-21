@@ -100,9 +100,9 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
     metadata["name"], metadata["username"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserName"]').text.split('\n'), ("NULL", "NULL"))
     metadata["location"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserLocation"]').text)
     metadata["website"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'a[data-testid="UserUrl"]').text)
-    metadata["join_date"] = ensures_or(driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserJoinDate"]').text)
-    metadata["following"] = ensures_or(driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
-    metadata["followers"] = ensures_or(driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
+    metadata["join_date"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserJoinDate"]').text)
+    metadata["following"] = ensures_or(lambda: driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
+    metadata["followers"] = ensures_or(lambda: driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
 
     if metadata.get("username", "NULL") == "NULL":
         raise RuntimeError("Fatal error, unable to resolve username {}".format(metadata))
@@ -115,7 +115,7 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
     if not force and os.path.exists(fpath):
         print("Folder already exists, skipping: {}".format(fpath))
         return
-    elif force:
+    elif force and os.path.exists(fpath):
         shutil.rmtree(fpath)
 
     os.makedirs(fpath)
@@ -141,12 +141,12 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
     last_id_count = 0
     tweets_tracker = set()
     boosted_tracker = set()
-    div_id_track = set()
     estimated_height = 0
+    div_track = set()
     try:
         last_height = 0
         new_height = 0
-        temp_load_times = load_times
+        time.sleep(random.uniform(load_times, load_times + 2))
         while True:
             if id_tracker >= number_posts_to_cap - 1:
                 break
@@ -162,50 +162,23 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
 
             tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
             for tweet in tweets:
-                # Enables backwards scrolling and looking at existing divs.
-                div_id = tweet.get_attribute("aria-labelledby") 
-                if div_id and div_id in div_id_track:
-                    print("Div track is working??")
-                    continue
-                print("DIV: {}".format(div_id))
-                div_id_track.add(div_id)
-
                 # Try to scroll there first and retry 2x load times before giving up.
                 # Then bump up global load times by one.
-                scrolled = False
-                limit = temp_load_times + 3
-                for lt in range(temp_load_times, limit):
-                    try:
-                        driver.execute_script("return arguments[0].scrollIntoView();", tweet)
-                        driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
-                        time.sleep(1)
-                        scrolled = True
-                        # Reset load times
-                        temp_load_times = load_times
-                        break
-                    except selenium.common.exceptions.StaleElementReferenceException as e:
-                        if lt < limit - 1:
-                            print("Loading times are getting harder. Bumping wait time for next iteration.")
-                            print_debug("Load time: {}".format(lt))
-                            try:
-                                WebDriverWait(driver, 20).until(EC.presence_of_element_located(tweet))
-                                driver.execute_script("window.scrollTo(0, window.pageYOffset - 20);")
-                            except:
-                                pass
-                        elif temp_load_times >= load_times + 2:
-                            print("Even after bumping global load times, still failing. Aborting task.")
-                            raise e
-                        else:
-                            print("This tweet just ain't load'in. Bumping global load times to: {}".format(temp_load_times))
-                            # Scroll backwards.
-                            driver.execute_script("window.scrollTo(0, window.pageYOffset - 10);")
-                            time.sleep(lt)
-                            temp_load_times += 1
-                            break
+                try:
+                    div_id = tweet.get_attribute("aria-labelledby")
+                    if div_id in div_track:
+                        continue
 
-                if not scrolled:
-                    print("SKIPPING")
-                    break
+                    div_track.add(div_id)
+                    driver.execute_script("return arguments[0].scrollIntoView();", tweet)
+                    driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
+                except:
+                    continue
+
+                height = float(driver.execute_script("return window.scrollTop || window.pageYOffset;"))
+                if height < estimated_height:
+                    continue
+                estimated_height = height
 
                 tm = {"id": id_tracker}
                 tm["tag_text"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
@@ -237,8 +210,6 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
                     print("ARLEAD {}".format(dtm))
                     continue
 
-                estimated_height += tweet.size["height"]
-
                 try:
                     # Try to remove elements before screenshot
                     remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
@@ -255,16 +226,16 @@ def fetch_html(driver, url, fpath, load_times, force=False, number_posts_to_cap=
                     break
     
             # Scroll!
-            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + 100))
             time.sleep(random.uniform(load_times, load_times + 2))
+            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + 10))
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
                 break
             last_height = new_height
+
     except selenium.common.exceptions.StaleElementReferenceException as e:
         print("Tweet limit reached, for {} unable to fetch more data. Authentication is required.".format(username))
         print("Or you can try to bump loading times.")
-        input()
         raise e
     except Exception as e:
         raise e

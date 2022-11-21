@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.2.0: Enable Login and New Scroll Method
+
+* Add `--login` for giving users login
+* New aglorithm for scrolling down content to prevent duplications
+
 ## 0.1.1: Better Folder Renames
 
 * Add some code-cleanup
