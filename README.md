@@ -30,7 +30,7 @@ This script is purely for the purposes of archival use only.
 python -m pip install -r requirements.txt
 
 # Take a snapshot from a given profile URL.
-python watcher.py --url www.twitter.com/<profile>
+python bin/watcher.py --url www.twitter.com/<profile>
 
 # For more help use:
 python bin/watcher.py --help
