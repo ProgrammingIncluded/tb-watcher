@@ -87,6 +87,35 @@ Once it's filed:
 - A team member will try to reproduce the issue with your provided steps. If there are no reproduction steps or no obvious way to reproduce the issue, the team will ask you for those steps and mark the issue as `needs-repro`. Bugs with the `needs-repro` tag will not be addressed until they are reproduced.
 - If the team is able to reproduce the issue, it will be marked `needs-fix`, as well as possibly other tags (such as `critical`), and the issue will be left to be [implemented by someone](#your-first-code-contribution).
 
+## Submitting a PR
+
+### Branch Structure
+
+As the project size changes, the branching structures will continue to evolve. Keep a look-out for any [announcements](https://github.com/ProgrammingIncluded/tb-watcher/discussions/categories/announcements) for up-to-date info on how feature branching will continue.
+
+As of version `v0.5.0: Supporting Our Community`, all contributions will need to be merged into the `develop` branch before being merged into `main`.
+`develop` branch can be considered the feature branch of our project and will contain all the necessary changes.
+
+A final sanity check will then be performed by our project maintainer before merging into `main` and an appropriate release tag filed.
+
+### Small Fixes and Patches
+
+Small changes, say 50 lines of code or less (or easy grep changes) can be made as a direct PR to `develop` to under-go review.
+If the fix was motivated by an issue on the repo, please mention the issue in the PR so we may use it to close an issue thread.
+
+### Medium to Large Fixes and Patches
+
+An Bug template should be submitted in [choose issue](https://github.com/ProgrammingIncluded/tb-watcher/issues/new/choose).
+Issue should be discussed and solutions explored prior to submitting a PR to reduce communication overhead. As well as ensure a solution that will work best for the project's constraints.
+
+### Feature PRs
+
+Feature PRs should have an associated enhancement/feature request filed by [choose issue](https://github.com/ProgrammingIncluded/tb-watcher/issues/new/choose).
+This will allow for discussions and ensuring that a community led solution can be created.
+
+As of `v0.5.0` there has been a few feature implementations being driven by the maintainer and may lack all the necessary issues / documentation.
+This is expected to disappear after past `v1.0.0` as the project stabilizes.
+
 ### Suggesting Enhancements
 
 This section guides you through submitting an enhancement suggestion for Tweet Bird Watcher, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
@@ -109,7 +138,6 @@ Enhancement suggestions are tracked as [GitHub issues feature request](https://g
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
 - You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
 - **Explain why this enhancement would be useful** to most Tweet Bird Watcher users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
-
 
 <!-- omit in toc -->
 ## Attribution
