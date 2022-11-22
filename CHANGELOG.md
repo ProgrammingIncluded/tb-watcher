@@ -20,42 +20,42 @@
 
 ## 0.5.0: Supporting Our Community
 
-* Added modularization of code
-  * Added `tb_watcher.driver_utils`
-  * Added `tb_watcher.swag`
-* Added better logging support via `logging` module
-* Added standardization for CHANGELOG
+* Added modularization of code in `src/`.
+* Added binaries in `bin/`.
+* Changed
+* Added better logging support via `logging` module.
+* Added standardization for CHANGELOG.
 * Added better CLI help groups.
-* Fixed README Typos and Divide by Zero Error (@jmallone)
+* Fixed README Typos and Divide by Zero Error (@jmallone).
 
 ## 0.4.0: More Algorithms
 
-* Added example README
-* Changed README
-* Added scroll algorithm selection
+* Added example README.
+* Changed README.
+* Added scroll algorithm selection.
 
 ## 0.3.0: Remove Ads and Average Scrolling
 
-* Added average scrolling to compensate for scroll heights
-* Added Ad removal logic
-* Fixed bug where post length was not respected
+* Added average scrolling to compensate for scroll heights.
+* Added Ad removal logic.
+* Fixed bug where post length was not respected.
 
 ## 0.2.0: Enable Login and New Scroll Method
 
-* Added `--login` for giving users login
-* Added new aglorithm for scrolling down content to prevent duplications
+* Added `--login` for giving users login.
+* Added new aglorithm for scrolling down content to prevent duplications.
 
 ## 0.1.1: Better Folder Renames
 
-* Added some code-cleanup
-* Added better pop-up removal support
-* Added `--url` support for single profile scraping
-* Added folder renaming to username functionality
-* Added tweet without login limit check
-* Added faster scrolling for centering content
+* Added some code-cleanup.
+* Added better pop-up removal support.
+* Added `--url` support for single profile scraping.
+* Added folder renaming to username functionality.
+* Added tweet without login limit check.
+* Added faster scrolling for centering content.
 
 ## 0.1.0: Initial Release
 
-* Added support for bio-only
-* Added snapshots of Twitter posts
-* Added max Twitter info
+* Added support for bio-only.
+* Added snapshots of Twitter posts.
+* Added max Twitter info.
