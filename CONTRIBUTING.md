@@ -1,5 +1,5 @@
 <!-- omit in toc -->
-# Contributing to Tweet Bird Watcher
+# Contributing to Twitter Bird Watcher
 
 First off, thanks for taking the time to contribute! ❤️
 
@@ -87,7 +87,7 @@ Once it's filed:
 
 ### Suggesting Enhancements
 
-This section guides you through submitting an enhancement suggestion for Tweet Bird Watcher, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
+This section guides you through submitting an enhancement suggestion for Twitter Bird Watcher, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
 
 <!-- omit in toc -->
 #### Before Submitting an Enhancement
@@ -106,7 +106,7 @@ Enhancement suggestions are tracked as [GitHub issues feature request](https://g
 - Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
 - You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
-- **Explain why this enhancement would be useful** to most Tweet Bird Watcher users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
+- **Explain why this enhancement would be useful** to most Twitter Bird Watcher users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
 
 ## Your First Code Contribution
 
