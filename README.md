@@ -1,19 +1,19 @@
 
 <p align="center">
-    <img height="418" src="logo.png" alt="Birdwatch Logo">
+    <img width="100%" src="logo.png" alt="Twitter Bird Watcher Logo">
 </p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-# Birdwatch: A Twitter Profile Archival Tool
+# Twitter Bird Watcher: A Twitter Profile Archival Tool
 
 
-Birdwatch snapshots a profile page when given a URL (or an exported `.js` list of `following` from the official Twitter exporter.)
+`TBWatcher` snapshots a profile page when given a URL (or an exported `.js` list from the official Twitter exporter.)
 Supports UTF-8 text JSON files and image snapshots of each Twitter post!
 
 This script is purely for the purposes of archival use only.
 
-![Birdwatch](demo.gif)
+![TBirdwatcher](demo.gif)
 
 ## Features
 
@@ -28,10 +28,12 @@ This script is purely for the purposes of archival use only.
 ```bash
 # Install the requirements. Once only.
 python -m pip install -r requirements.txt
-python birdwatch.py --url www.twitter.com/<profile>
+
+# Take a snapshot from a given profile URL.
+python watcher.py --url www.twitter.com/<profile>
 
 # For more help use:
-python birdwatch.py --help
+python bin/watcher.py --help
 ```
 
 Tested on Python 3.10.
@@ -123,13 +125,17 @@ Invalid string entries will be marked as "NULL".
 
 ## Troubleshoot
 
-* My scraper terminates early?
+* `TBWatcher` terminates early?
 
-It is possible that your images are taking sometime to load, Consider using `-s` to adjust load-time.
+It is possible that your images are taking sometime to load. Consider using `-s` to adjust load-time.
 Or your scrolling height is too low / too high. Consider using `--scroll-algorithm` to adjust the type of algorithm
 Then passing in a value to the algorithm `--scroll-value`.
 
 "--help" has more information as to what `--scroll-value` encodes.
+
+## Contributing
+
+Intrested in contributing? Take a look at our [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Future Updates and Goals
 
