@@ -22,7 +22,7 @@
 
 * Added modularization of code in `src/`.
 * Added binaries in `bin/`.
-* Changed projecet name from `BirdWatch` -> `Twitter Bird Watcher` (`TBWatcher`)
+* Changed project name from `BirdWatch` -> `Twitter Bird Watcher` (`TBWatcher`)
 * Added better logging support via `logging` module.
 * Added standardization for CHANGELOG.
 * Added better CLI help groups.
