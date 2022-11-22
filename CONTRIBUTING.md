@@ -132,7 +132,7 @@ Issue should be discussed and solutions explored prior to submitting a PR to red
 ### Feature PRs
 
 Feature PRs should have an associated enhancement/feature request filed by [choose issue](https://github.com/ProgrammingIncluded/tb-watcher/issues/new/choose).
-This will allow for discussions and ensuring that a community led solution can be created.
+This will allow for discussions and ensuring that a community is informed.
 
 As of `v0.5.0` there has been a few feature implementations being driven by the maintainer and may lack all the necessary issues / documentation.
 This is expected to disappear after past `v1.0.0` as the project stabilizes.
