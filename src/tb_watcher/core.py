@@ -151,6 +151,10 @@ def fetch_html(
                 # Try to scroll there first and retry 2x load times before giving up.
                 # Then bump up global load times by one.
                 try:
+                    ad = remove_ads(driver)
+                    if ad:
+                        continue
+
                     div_id = tweet.get_attribute("aria-labelledby")
                     if div_id in div_track:
                         continue
@@ -159,9 +163,6 @@ def fetch_html(
                     driver.execute_script("return arguments[0].scrollIntoView();", tweet)
                     driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
 
-                    ad = remove_ads(driver)
-                    if ad:
-                        continue
                 except:
                     continue
 

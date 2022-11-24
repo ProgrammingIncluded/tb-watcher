@@ -18,6 +18,10 @@
 
 # Changes
 
+## vNEXT
+
+* Fixed potential for some posts to be skipped on ad removal.
+
 ## 0.5.0: Supporting Our Community
 
 * Added modularization of code in `src/`.
