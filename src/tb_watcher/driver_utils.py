@@ -5,8 +5,10 @@ By: ProgrammingIncluded
 
 # std
 import os
+import time
+import random
 
-from typing import List
+from typing import Callable, List
 from dataclasses import dataclass, asdict
 
 # tb_watcher
@@ -41,12 +43,22 @@ class Tweet:
     reply_count: str
     potential_boost: bool
 
+@dataclass(init=True, repr=True, unsafe_hash=True)
+class BioMetadata:
+    username: str
+    bio: str
+    name: str
+    location: str
+    website: str
+    join_date: str
+    following: str
+    followers: str
 class MaxCapturesReached(RuntimeError):
     """The specified number of captures have been reached."""
 
 class TweetExtractor:
     """
-    Generates Tweets from a given post.
+    Generates Tweets from a page of posts.
     """
 
     def __init__(self, tweets_path: str, max_captures: int = None):
@@ -168,6 +180,42 @@ class TweetExtractor:
         for t in self.tweets_tracker:
             results.append(asdict(t))
         return results
+
+    def create_offset_function(self, offset_func: Callable):
+        return lambda: offset_func(self.height_diffs)
+
+class Scroller:
+    """
+    Encapsulates a scrolling mechanism to generate more Tweets on a given page.
+    Requires a data previous scrolls to do predictions.
+    """
+    def __init__(self, driver: webdriver, offset_func: Callable, load_time: int):
+        self.prev_height = 0
+        self.offset_func = offset_func
+        self.driver = driver
+        self.load_time = load_time
+        self.height = 0
+
+    def __iter__(self):
+        self.prev_height = 0
+        self.height = 0
+        time.sleep(random.uniform(self.load_time, self.load_time + 2))
+        return self
+
+    def __next__(self):
+        predict_next_scroll = self.offset_func() + self.prev_height
+        self.driver.execute_script("window.scrollTo(0, {});".format(predict_next_scroll))
+
+        # Wait for data to load.
+        time.sleep(random.uniform(self.load_time, self.load_time + 2))
+
+        new_height = self.driver.execute_script("return document.body.scrollHeight")
+        if new_height == self.prev_height:
+            # We've  hit the end of the page
+            raise StopIteration
+
+        self.prev_height = new_height
+
 
 def remove_elements(driver: webdriver , elements: List[str], remove_parent: bool = True):
     elements = ["'{}'".format(v) for v in elements]

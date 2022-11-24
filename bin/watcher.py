@@ -70,6 +70,9 @@ def main():
         "number_posts_to_cap": args.posts
     }
 
+    if args.debug:
+        logger.setLevel(logger.DEBUG)
+
     # Select a scrolling algorithm before starting any drivers.
     f = None
     if args.scroll_algorithm == "percentile":
