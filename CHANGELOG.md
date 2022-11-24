@@ -20,7 +20,13 @@
 
 ## vNEXT
 
+* Added `TwitterPageInterface` used for representing a page in Twitter.
+* Added `TwitterBio` which is used for fetching and obtaining bio pages.
+* Added `TweetFetcher` which attempts to fetch all available Tweets on a page.
+* Added `Scroller` which abstracts away scrolling metrics.
 * Fixed potential for some posts to be skipped on ad removal.
+* Fixed logger not outputting any info.
+* Fixed logger not printing debug.
 
 ## 0.5.0: Supporting Our Community
 
