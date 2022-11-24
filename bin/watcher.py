@@ -72,6 +72,8 @@ def main():
         "number_posts_to_cap": args.posts
     }
 
+    args.output_fpath = args.output_fpath.strip()
+
     if args.debug:
         logger.setLevel(logger.DEBUG)
         logger.debug("Debug mode set.")

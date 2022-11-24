@@ -6,7 +6,9 @@ By: ProgrammingIncluded
 # std
 import os
 import time
+import json
 import random
+from abc import abstractmethod
 from urllib.parse import urlparse
 
 from typing import Callable, List
@@ -33,8 +35,13 @@ def ensures_or(f: str, otherwise: str = "NULL"):
 
     return otherwise
 
+class Unique:
+    @abstractmethod
+    def unique_id(self):
+        """Used for folder writing."""
+
 @dataclass(init=True, repr=True, unsafe_hash=True)
-class Tweet:
+class Tweet(Unique):
     """
     Helper class for representing metadata of a tweet.
     Useful for hashing functions and lookup tables.
@@ -50,11 +57,15 @@ class Tweet:
     reply_count: str
     potential_boost: bool
 
-    def get_url():
+    def get_url(self):
         return "https://www.twitter.com/{clean_handle}/status/{id}".format(self.handle[1:], self.id)
 
+    def unique_id(self):
+        """Used for folder writing."""
+        return self.id
+
 @dataclass(init=True, repr=True, unsafe_hash=True)
-class BioMetadata:
+class BioMetadata(Unique):
     username: str
     bio: str
     name: str
@@ -64,15 +75,36 @@ class BioMetadata:
     following: str
     followers: str
 
+    def unique_id(self):
+        """Used for folder writing."""
+        return self.username[1:]
+
 class MaxCapturesReached(RuntimeError):
     """The specified number of captures have been reached."""
 
+def tweet_dom_get_basic_metadata(tweet_dom):
+    """Retrieves all metadata from tweet dom except unique id."""
+    tm = {"id": "null"}
+    tm["tag_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
+    try:
+        tm["name"], tm["handle"], _, tm["timestamp"] = ensures_or(lambda: tm["tag_text"].split('\n'), tuple(["UKNOWN" for _ in range(4)]))
+    except Exception as e:
+        tm["name"], tm["handle"], tm["timestamp"] = tm["tag_text"], "ERR", "ERR"
+
+    tm["tweet_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="tweetText"]').text)
+    tm["retweet_count"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="retweet"]').text)
+    tm["like_count"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="like"]').text)
+    tm["reply_count"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="reply"]').text)
+    tm["potential_boost"] = False
+    return Tweet(**tm)
+
 class TweetExtractor:
     """
-    Generates Tweets from a page of posts.
+    Generates Tweets from a page of tweets.
+    Since tweets can occur in several types of pages, this is considered a helper.
     """
 
-    def __init__(self, tweets_path: str, max_captures: int = None):
+    def __init__(self, root_dir: str, max_captures: int = None):
         self.counter = 0
         self.last_id = 0
         self.last_id_count = 0
@@ -82,7 +114,7 @@ class TweetExtractor:
         self.boosted_tracker = set() # Used for tracking boosted tweets by saving tweet texts.
 
         self.tweets_tracker = set()
-        self.tweets_path = tweets_path
+        self.root_dir = root_dir
         self.max_captures = max_captures
 
     def get_scroll_offset_history(self) -> List[float]:
@@ -92,32 +124,14 @@ class TweetExtractor:
         """
         return self.height_diffs
 
-    def get_tweet(self, tweet_dom, driver: webdriver) -> Tweet:
-        tm = {}
-        tm["tag_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
-        try:
-            tm["name"], tm["handle"], _, tm["timestamp"] = ensures_or(lambda: tm["tag_text"].split('\n'), tuple(["UKNOWN" for _ in range(4)]))
-        except Exception as e:
-            tm["name"], tm["handle"], tm["timestamp"] = tm["tag_text"], "ERR", "ERR"
-    
-        tm["tweet_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="tweetText"]').text)
-        tm["retweet_count"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="retweet"]').text)
-        tm["like_count"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="like"]').text)
-        tm["reply_count"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="reply"]').text)
+    def write_json(self):
+        with open(os.path.join(self.root_dir, "tweets.json"), "w", encoding="utf-8") as f:
+            json.dump(self.get_tweets_as_dict(), f, ensure_ascii=False)
 
-        if tm["tweet_text"] != "NULL":
-            if tm["tweet_text"] in self.boosted_tracker:
-                # We need to go back in time to find the boosted post!
-                # We match boosts by tweet text.
-                for t in self.tweets_tracker:
-                    if t.tweet_text == tm["tweet_text"]:
-                        t.potential_boost = True
-                        break
-
-            tm["potential_boost"] = False
-            self.boosted_tracker.add(tm["tweet_text"])
-        else:
-            tm["potential_boost"] = False
+    def get_tweet(self, tweet_dom, driver: webdriver, fetch_threads: bool, load_time: int, offset_func: Callable) -> Tweet:
+        # Lazy load because of circular dependencies.
+        # this can be avoided if we pull out the logic at some point.
+        from tb_watcher.pages import TwitterThread
 
         # Determine the id of the tweet by look at it in a separate window
         windows_before  = driver.current_window_handle
@@ -137,11 +151,30 @@ class TweetExtractor:
         all_new_windows = [x for x in windows_after if x != windows_before]
         driver.switch_to.window(all_new_windows[0])
 
-        raw_url = driver.current_url
-        assert "status/" in raw_url, "Is this a valid status URL?: {}".format(raw_url)
-        path = urlparse(raw_url).path
-        post_url =path.split("status/")[-1]
-        tm["id"] = post_url.split("/")[0]
+        # Clicking on a tweet guarantees it to be a TwitterThread page.
+        tm = TwitterThread(self.root_dir, driver.current_url, existing_driver=driver).fetch_metadata()
+        if tm.tweet_text != "NULL":
+            if tm.tweet_text in self.boosted_tracker:
+                # We need to go back in time to find the boosted post!
+                # We match boosts by tweet text.
+                for t in self.tweets_tracker:
+                    if t.tweet_text == tm.tweet_text:
+                        t.potential_boost = True
+                        break
+
+            tm.potential_boost = False
+            self.boosted_tracker.add(tm.tweet_text)
+        else:
+            tm.potential_boost = False
+
+
+        if fetch_threads:
+            # TODO, save to file
+            threads = tm.fetch_tweets(
+                self.max_captures,
+                self.load_time,
+                self.offset_func
+            )
 
         # Close all non-windows
         for n in all_new_windows:
@@ -149,9 +182,9 @@ class TweetExtractor:
             driver.close()
 
         driver.switch_to.window(windows_before)
-        return Tweet(**tm)
+        return tm
 
-    def capture_all_available_tweets(self, driver: webdriver) -> List[Tweet]:
+    def capture_all_available_tweets(self, driver: webdriver, fetch_threads: bool, load_time: int, offset_func: Callable) -> List[Tweet]:
         """
         Obtains post data at current scroll location of the driver and returns an instance of all available tweets.
 
@@ -198,19 +231,12 @@ class TweetExtractor:
             self.prev_height = height
 
             # Tweet info
-            dtm = self.get_tweet(tweet, driver)
+            dtm = self.get_tweet(tweet, driver, fetch_threads, load_time, offset_func)
             # We've seen this post before
             if dtm in self.tweets_tracker:
                 continue
 
-            try:
-                # Try to remove elements before screenshot
-                remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-                tweet.screenshot(os.path.join(self.tweets_path, "{}.png".format(dtm.id)))
-            except Exception as e:
-                # Failure to screenshot maybe because the tweet is too stale. Skip for now.
-                continue
-
+            # Create a tweet's folder
             self.counter += 1
             self.tweets_tracker.add(dtm)
 
