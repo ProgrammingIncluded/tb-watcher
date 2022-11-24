@@ -9,11 +9,13 @@ import json
 import shutil
 import time
 
-from dataclasses import dataclass
-from typing import Callable
+from abc import ABC, abstractmethod
+from typing import Callable, List
+from dataclasses import asdict
 
 # bluebird watcher
-from tb_watcher.driver_utils import remove_elements, remove_ads
+from tb_watcher.driver_utils import (BioMetadata, MaxCapturesReached, Scroller, TweetExtractor, Tweet,
+                                     ensures_or, remove_elements, create_chrome_driver)
 from tb_watcher.logger import logger
 
 # selenium
@@ -25,30 +27,116 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 DEF_NUM_TWEETS = 20
 
-@dataclass(init=True, repr=True, unsafe_hash=True)
-class Tweet:
+class TwitterPageInterface(ABC):
+    """Interface for a page on Twitter.
+    Each page can allow for a driveer to optimize multi-threading.
     """
-    Helper class for representing metadata of a tweet.
-    Useful for hashing functions and lookup tables.
+    @abstractmethod
+    def get_driver(self) -> webdriver:
+        """
+        Returns the driver for a given page.
+        """
+
+class TwitterBio(TwitterPageInterface):
     """
-    id: str
-    tag_text: str
-    name: str
-    tweet_text: str
-    retweet_count: str
-    handle: str
-    timestamp: str
-    like_count: str
-    reply_count: str
-    potential_boost: bool
+    Class encapsulating a twitter bio page.
+    Owns an instance of driver for capturing your driving needs.
+    """
+    def __init__(self, url: str, existing_driver: webdriver = None):
+        # Must be fetched or deserialized.
+        self.metadata = None
 
-def ensures_or(f: str, otherwise: str = "NULL"):
-    try:
-        return f()
-    except Exception as e:
-        logger.debug("Could not obtain using {} instead. Error: {}".format(otherwise, str(e)))
+        if existing_driver:
+            self.driver = existing_driver
+        else:
+            self.driver = create_chrome_driver()
+        self.url = url
 
-    return otherwise
+    def get_driver(self) -> webdriver:
+        return self.driver
+
+    def fetch_bio_data(self) -> BioMetadata:
+        self.driver.get(self.url)
+
+        state = ""
+        while state != "complete":
+            time.sleep(random.uniform(3, 5))
+            state = self.driver.execute_script("return document.readyState")
+    
+        WebDriverWait(self.driver, 30).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, '[data-testid="tweet"]')))
+    
+        # Remove initial popups.
+        remove_elements(self.driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
+    
+        # delete bottom element
+        remove_elements(self.driver, ["BottomBar"])
+    
+        metadata = {}
+        metadata["bio"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserDescription"]').text)
+        metadata["name"], metadata["username"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserName"]').text.split('\n'), ("NULL", "NULL"))
+        metadata["location"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserLocation"]').text)
+        metadata["website"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'a[data-testid="UserUrl"]').text)
+        metadata["join_date"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserJoinDate"]').text)
+        metadata["following"] = ensures_or(lambda: self.driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
+        metadata["followers"] = ensures_or(lambda: self.driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
+    
+        if metadata.get("username", "NULL") == "NULL":
+            raise RuntimeError("Fatal error, unable to resolve username {}".format(metadata))
+
+        # Save metadata as local value.
+        self.metadata = BioMetadata(**metadata)
+    
+        return self.metadata
+
+    def fetch_tweets(
+        self,
+        number_posts_to_cap: int,
+        tweets_path: str,
+        load_time: int,
+        offset_func: Callable
+    ) -> List[Tweet]:
+        id_tracker = 0
+        last_id = id_tracker
+        last_id_count = 0
+
+        extractor = TweetExtractor(tweets_path, max_captures=number_posts_to_cap)
+
+        # Wrap the offset function with extract height context.
+        offset_func = extractor.create_offset_function(offset_func)
+        try:
+            time.sleep(random.uniform(load_time, load_time + 2))
+            for _ in Scroller(self.driver, offset_func, load_time):
+                if id_tracker >= number_posts_to_cap - 1:
+                    break
+                elif last_id_count > 5:
+                    logger.debug("No more data to load?")
+                    break
+
+                # Just in case we keep hitting the same id.
+                if last_id == id_tracker:
+                    last_id_count += 1
+                else:
+                    last_id = id_tracker
+                    last_id_count = 0
+
+                # Capture the tweets and generates files for them
+                extractor.capture_all_available_tweets(self.driver)
+        except selenium.common.exceptions.StaleElementReferenceException as e:
+            logger.warning("Tweet limit reached, for {} unable to fetch more data. Authentication is required.".format(self.metadata.username))
+            logger.warning("Or you can try to bump loading times.")
+            raise e
+        except MaxCapturesReached as e:
+            pass
+        except Exception as e:
+            raise e
+        finally:
+            # Dump all metadata
+            with open(os.path.join(tweets_path, "tweets.json"), "w", encoding="utf-8") as f:
+                json.dump(extractor.get_tweets_as_dict(), f, ensure_ascii=False)
+
+    def get_bio_as_dict(self) -> dict:
+        return asdict(self.metadata)
 
 def fetch_html(
     driver: webdriver,
@@ -64,37 +152,12 @@ def fetch_html(
     # Many thanks to: https://www.scrapingbee.com/blog/web-scraping-twitter/
     # for the inspiration.
     # Major adjustments to make UX a lot smoother.
+    twitter_bio = TwitterBio(url, existing_driver=driver)
+    b_meta = twitter_bio.fetch_bio_data()
 
-    driver.get(url)
-    state = ""
-    while state != "complete":
-        time.sleep(random.uniform(3, 5))
-        state = driver.execute_script("return document.readyState")
-
-    WebDriverWait(driver, 30).until(EC.presence_of_element_located(
-        (By.CSS_SELECTOR, '[data-testid="tweet"]')))
-
-    # Remove initial popups.
-    remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-
-    # delete bottom element
-    remove_elements(driver, ["BottomBar"])
-
-    metadata = {}
-    metadata["bio"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserDescription"]').text)
-    metadata["name"], metadata["username"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserName"]').text.split('\n'), ("NULL", "NULL"))
-    metadata["location"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserLocation"]').text)
-    metadata["website"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'a[data-testid="UserUrl"]').text)
-    metadata["join_date"] = ensures_or(lambda: driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserJoinDate"]').text)
-    metadata["following"] = ensures_or(lambda: driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
-    metadata["followers"] = ensures_or(lambda: driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
-
-    if metadata.get("username", "NULL") == "NULL":
-        raise RuntimeError("Fatal error, unable to resolve username {}".format(metadata))
-
-    # Change the fpath and resolve username
-    username = metadata["username"]
-    username = username[1:] if username.startswith("@") else username
+    username = b_meta.username
+    assert b_meta.username[0] == "@"
+    username = username[1:]
 
     fpath = os.path.join(fpath, username) 
     if not force and os.path.exists(fpath):
@@ -108,7 +171,7 @@ def fetch_html(
     # Force utf-8
     # Save a copy of the metadata
     with open(os.path.join(fpath, "metadata.json"), "w", encoding="utf-8") as f:
-        json.dump(metadata, f, ensure_ascii=False)
+        json.dump(twitter_bio.get_bio_as_dict(), f, ensure_ascii=False)
 
     # Save a screen shot of the bio
     driver.save_screenshot(os.path.join(fpath, "profile.png"))
@@ -120,116 +183,9 @@ def fetch_html(
     tweets_path = os.path.join(fpath, "tweets")
     os.makedirs(tweets_path)
 
-    tweets_metadata = []
-    id_tracker = 0
-    last_id = id_tracker
-    last_id_count = 0
-    tweets_tracker = set()
-    boosted_tracker = set()
-    estimated_height = 0
-    height_diffs = []
-    div_track = set()
-    try:
-        last_height = 0
-        new_height = 0
-        time.sleep(random.uniform(load_times, load_times + 2))
-        while True:
-            if id_tracker >= number_posts_to_cap - 1:
-                break
-            elif last_id_count > 5:
-                logger.debug("No more data to load?")
-                break
-
-            if last_id == id_tracker:
-                last_id_count += 1
-            else:
-                last_id = id_tracker
-                last_id_count = 0
-
-            tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
-            for tweet in tweets:
-                # Try to scroll there first and retry 2x load times before giving up.
-                # Then bump up global load times by one.
-                try:
-                    div_id = tweet.get_attribute("aria-labelledby")
-                    if div_id in div_track:
-                        continue
-
-                    div_track.add(div_id)
-                    driver.execute_script("return arguments[0].scrollIntoView();", tweet)
-                    driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
-
-                    ad = remove_ads(driver)
-                    if ad:
-                        continue
-                except:
-                    continue
-
-                height = float(driver.execute_script("return window.scrollTop || window.pageYOffset;"))
-                if height < estimated_height:
-                    continue
-                height_diffs.append(height - estimated_height)
-                estimated_height = height
-
-                tm = {"id": id_tracker}
-                tm["tag_text"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
-                try:
-                    tm["name"], tm["handle"], _, tm["timestamp"] = ensures_or(lambda: tm["tag_text"].split('\n'), tuple(["UKNOWN" for _ in range(4)]))
-                except Exception as e:
-                    tm["name"], tm["handle"], tm["timestamp"] = tm["tag_text"], "ERR", "ERR"
-    
-                tm["tweet_text"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="tweetText"]').text)
-                tm["retweet_count"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="retweet"]').text)
-                tm["like_count"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="like"]').text)
-                tm["reply_count"] = ensures_or(lambda: tweet.find_element(By.CSS_SELECTOR,'div[data-testid="reply"]').text)
-
-                if tm["tweet_text"] != "NULL":
-                    if tm["tweet_text"] in boosted_tracker:
-                        # We need to go back in time to find the boosted post!
-                        for t in tweets_metadata:
-                            if t["tweet_text"] == tm["tweet_text"]:
-                                t["potential_boost"] = True
-                                break
-
-                    tm["potential_boost"] = False
-                    boosted_tracker.add(tm["tweet_text"])
-                else:
-                    tm["potential_boost"] = False
-
-                dtm = Tweet(**tm)
-                if dtm in tweets_tracker:
-                    continue
-
-                try:
-                    # Try to remove elements before screenshot
-                    remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-                    tweet.screenshot(os.path.join(tweets_path, "{}.png".format(id_tracker)))
-                except Exception as e:
-                    # Failure to screenshot maybe because the tweet is too stale. Skip for now.
-                    continue
-
-                id_tracker += 1
-                tweets_metadata.append(tm)
-                tweets_tracker.add(dtm)
-
-                if id_tracker > number_posts_to_cap:
-                    break
-    
-            # Scroll!
-            driver.execute_script("window.scrollTo(0, {});".format(estimated_height + offset_func(height_diffs)))
-            time.sleep(random.uniform(load_times, load_times + 2))
-            new_height = driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                break
-            last_height = new_height
-
-    except selenium.common.exceptions.StaleElementReferenceException as e:
-        logger.warning("Tweet limit reached, for {} unable to fetch more data. Authentication is required.".format(username))
-        logger.warning("Or you can try to bump loading times.")
-        raise e
-    except Exception as e:
-        raise e
-    finally:
-        # Dump all metadata
-        with open(os.path.join(tweets_path, "tweets.json"), "w", encoding="utf-8") as f:
-            json.dump(tweets_metadata, f, ensure_ascii=False)
+    twitter_bio.fetch_tweets(
+        number_posts_to_cap,
+        tweets_path,
+        load_times,
+        offset_func
+    )
