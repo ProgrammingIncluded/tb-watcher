@@ -14,7 +14,8 @@ from typing import Callable, List
 from dataclasses import asdict
 
 # bluebird watcher
-from tb_watcher.driver_utils import (BioMetadata, MaxCapturesReached, Scroller, TweetExtractor, Tweet, ensures_or, remove_elements)
+from tb_watcher.driver_utils import (BioMetadata, MaxCapturesReached, Scroller, TweetExtractor, Tweet,
+                                     ensures_or, remove_elements, create_chrome_driver)
 from tb_watcher.logger import logger
 
 # selenium
@@ -23,8 +24,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 DEF_NUM_TWEETS = 20
 
@@ -50,7 +49,7 @@ class TwitterBio(TwitterPageInterface):
         if existing_driver:
             self.driver = existing_driver
         else:
-            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+            self.driver = create_chrome_driver()
         self.url = url
 
     def get_driver(self) -> webdriver:

@@ -24,6 +24,7 @@
 * Added `TwitterBio` which is used for fetching and obtaining bio pages.
 * Added `TweetFetcher` which attempts to fetch all available Tweets on a page.
 * Added `Scroller` which abstracts away scrolling metrics.
+* Changed random messages from ChromeDriver, makes logs cleaner.
 * Fixed potential for some posts to be skipped on ad removal.
 * Fixed logger not outputting any info.
 * Fixed logger not printing debug.

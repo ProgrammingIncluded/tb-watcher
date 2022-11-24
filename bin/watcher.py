@@ -19,6 +19,7 @@ import tb_watcher.swag as swag
 
 from tb_watcher.core import fetch_html
 from tb_watcher.logger import logger 
+from tb_watcher.driver_utils import create_chrome_driver
 from tb_watcher.math_utils import calc_average_percentile, window_average, constant
 
 # selenium
@@ -60,6 +61,7 @@ def main():
     print(swag.LOGO)
     print(swag.TITLE)
 
+    logger.info("Initializing...")
     # Create output folder if DNE.
     os.makedirs(args.output_fpath, exist_ok=True)
 
@@ -72,6 +74,7 @@ def main():
 
     if args.debug:
         logger.setLevel(logger.DEBUG)
+        logger.debug("Debug mode set.")
 
     # Select a scrolling algorithm before starting any drivers.
     f = None
@@ -85,7 +88,7 @@ def main():
 
     extra_args["offset_func"] = f
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    driver = create_chrome_driver()
     if args.login:
         driver.get("https://twitter.com/login")
         input("Please logging then press any key in CLI to continue...")

@@ -16,6 +16,8 @@ from tb_watcher.logger import logger
 
 # selenium
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 
 def ensures_or(f: str, otherwise: str = "NULL"):
@@ -252,3 +254,9 @@ def remove_ads(driver: webdriver) -> bool:
         }
         return false;
     """)
+
+def create_chrome_driver() -> webdriver:
+    """Creates a chrome driver with silenced warnings and custom options."""
+    options = webdriver.ChromeOptions()
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    return webdriver.Chrome(options=options, service=Service(ChromeDriverManager().install()))
