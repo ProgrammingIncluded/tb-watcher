@@ -9,7 +9,6 @@ import json
 import shutil
 import time
 
-from abc import ABC, abstractmethod
 from typing import Callable, List
 from dataclasses import asdict
 
@@ -27,23 +26,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 DEF_NUM_TWEETS = 20
 
-class TwitterPageInterface(ABC):
+class TwitterPage:
     """Interface for a page on Twitter.
     Each page can allow for a driveer to optimize multi-threading.
     """
-    @abstractmethod
-    def get_driver(self) -> webdriver:
-        """
-        Returns the driver for a given page.
-        """
-
-class TwitterBio(TwitterPageInterface):
-    """
-    Class encapsulating a twitter bio page.
-    Owns an instance of driver for capturing your driving needs.
-    """
     def __init__(self, url: str, existing_driver: webdriver = None):
-        # Must be fetched or deserialized.
         self.metadata = None
 
         if existing_driver:
@@ -53,8 +40,21 @@ class TwitterBio(TwitterPageInterface):
         self.url = url
 
     def get_driver(self) -> webdriver:
+        """
+        Returns the driver for a given page.
+        """
         return self.driver
 
+class TwitterThread(TwitterPage):
+    """
+    Class encapsulating a twitter thread page.
+    """
+
+
+class TwitterBio(TwitterPage):
+    """
+    Class encapsulating a twitter bio page.
+    """
     def fetch_bio_data(self) -> BioMetadata:
         self.driver.get(self.url)
 
@@ -86,7 +86,6 @@ class TwitterBio(TwitterPageInterface):
 
         # Save metadata as local value.
         self.metadata = BioMetadata(**metadata)
-    
         return self.metadata
 
     def fetch_tweets(

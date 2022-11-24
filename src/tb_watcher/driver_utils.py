@@ -7,6 +7,7 @@ By: ProgrammingIncluded
 import os
 import time
 import random
+from urllib.parse import urlparse
 
 from typing import Callable, List
 from dataclasses import dataclass, asdict
@@ -15,10 +16,14 @@ from dataclasses import dataclass, asdict
 from tb_watcher.logger import logger
 
 # selenium
+import selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 def ensures_or(f: str, otherwise: str = "NULL"):
     try:
@@ -45,6 +50,9 @@ class Tweet:
     reply_count: str
     potential_boost: bool
 
+    def get_url():
+        return "https://www.twitter.com/{clean_handle}/status/{id}".format(self.handle[1:], self.id)
+
 @dataclass(init=True, repr=True, unsafe_hash=True)
 class BioMetadata:
     username: str
@@ -55,6 +63,7 @@ class BioMetadata:
     join_date: str
     following: str
     followers: str
+
 class MaxCapturesReached(RuntimeError):
     """The specified number of captures have been reached."""
 
@@ -64,7 +73,7 @@ class TweetExtractor:
     """
 
     def __init__(self, tweets_path: str, max_captures: int = None):
-        self.id_tracker = 0
+        self.counter = 0
         self.last_id = 0
         self.last_id_count = 0
         self.prev_height = 0.0
@@ -83,8 +92,8 @@ class TweetExtractor:
         """
         return self.height_diffs
 
-    def get_tweet(self, tweet_dom) -> Tweet:
-        tm = {"id": self.id_tracker}
+    def get_tweet(self, tweet_dom, driver: webdriver) -> Tweet:
+        tm = {}
         tm["tag_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
         try:
             tm["name"], tm["handle"], _, tm["timestamp"] = ensures_or(lambda: tm["tag_text"].split('\n'), tuple(["UKNOWN" for _ in range(4)]))
@@ -110,6 +119,36 @@ class TweetExtractor:
         else:
             tm["potential_boost"] = False
 
+        # Determine the id of the tweet by look at it in a separate window
+        windows_before  = driver.current_window_handle
+        try:
+            action = webdriver.common.action_chains.ActionChains(driver)
+            action.move_to_element_with_offset(tweet_dom, tweet_dom.size["width"] // 2, 5) \
+                  .key_down(Keys.CONTROL) \
+                  .click() \
+                  .key_up(Keys.CONTROL) \
+                  .perform()
+        except selenium.common.exceptions.ElementClickInterceptedException:
+            # It is okay for clicks to be intercepted.
+            pass
+
+        WebDriverWait(driver, 10).until(EC.number_of_windows_to_be(2))
+        windows_after = driver.window_handles
+        all_new_windows = [x for x in windows_after if x != windows_before]
+        driver.switch_to.window(all_new_windows[0])
+
+        raw_url = driver.current_url
+        assert "status/" in raw_url, "Is this a valid status URL?: {}".format(raw_url)
+        path = urlparse(raw_url).path
+        post_url =path.split("status/")[-1]
+        tm["id"] = post_url.split("/")[0]
+
+        # Close all non-windows
+        for n in all_new_windows:
+            driver.switch_to.window(n)
+            driver.close()
+
+        driver.switch_to.window(windows_before)
         return Tweet(**tm)
 
     def capture_all_available_tweets(self, driver: webdriver) -> List[Tweet]:
@@ -126,13 +165,14 @@ class TweetExtractor:
         Raises:
             MaxCapturesReached: Total number of saved tweets have been met.
         """
-        if self.max_captures and self.id_tracker >= self.max_captures:
+        if self.max_captures and self.counter >= self.max_captures:
             raise MaxCapturesReached()
 
         tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
         for tweet in tweets:
             try:
                 ad = remove_ads(driver)
+                remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
                 if ad:
                     continue
 
@@ -158,7 +198,7 @@ class TweetExtractor:
             self.prev_height = height
 
             # Tweet info
-            dtm = self.get_tweet(tweet)
+            dtm = self.get_tweet(tweet, driver)
             # We've seen this post before
             if dtm in self.tweets_tracker:
                 continue
@@ -166,15 +206,15 @@ class TweetExtractor:
             try:
                 # Try to remove elements before screenshot
                 remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-                tweet.screenshot(os.path.join(self.tweets_path, "{}.png".format(self.id_tracker)))
+                tweet.screenshot(os.path.join(self.tweets_path, "{}.png".format(dtm.id)))
             except Exception as e:
                 # Failure to screenshot maybe because the tweet is too stale. Skip for now.
                 continue
 
-            self.id_tracker += 1
+            self.counter += 1
             self.tweets_tracker.add(dtm)
 
-            if self.max_captures and self.id_tracker > self.max_captures:
+            if self.max_captures and self.counter > self.max_captures:
                 break
 
     def get_tweets_as_dict(self) -> List[dict]:
@@ -201,7 +241,6 @@ class Scroller:
     def __iter__(self):
         self.prev_height = 0
         self.height = 0
-        time.sleep(random.uniform(self.load_time, self.load_time + 2))
         return self
 
     def __next__(self):

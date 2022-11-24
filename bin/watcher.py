@@ -95,6 +95,7 @@ def main():
 
     data = []
     if args.url:
+        logger.info("Watching: {}".format(args.url))
         fetch_html(driver, args.url, fpath=args.output_fpath, **extra_args)
     else:
         weird_opening = "window\..* = (\[[\S\s]*)"
@@ -110,9 +111,11 @@ def main():
     
         for d in data:
             account = d["following"]
-            fetch_html(driver, account["userLink"], fpath=args.output_fpath, **extra_args)
+            url = account["userLink"]
+            logger.info("Watching: {}".format(url))
+            fetch_html(driver, url, fpath=args.output_fpath, **extra_args)
 
-    logger.info("ALL SCRAPING COMPLETED!")
+    logger.info("ALL SNAPSHOTS COMPLETED!")
 
 if __name__ == "__main__":
     main()
