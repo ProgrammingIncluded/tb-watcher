@@ -11,17 +11,18 @@ import random
 import time
 import json
 import shutil
+import threading
 
 from abc import abstractmethod
 from typing import Callable, List
 from dataclasses import asdict
 from urllib.parse import urlparse
+from queue import Queue
 
 # tb_watcher
 from tb_watcher.logger import logger
 from tb_watcher.driver_utils import (BioMetadata, MaxCapturesReached, Scroller, TweetExtractor, Tweet,
-                                     ensures_or, remove_elements, create_chrome_driver, tweet_dom_get_basic_metadata,
-                                     hit_more_replies, get_recommend_tweets_height)
+                                     ensures_or, remove_elements, create_chrome_driver, tweet_dom_get_basic_metadata)
 
 # selenium
 import selenium
@@ -29,6 +30,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+
 
 class TwitterPage:
     """Interface for a page on Twitter.
@@ -143,9 +145,7 @@ class TwitterThread(TwitterPage):
             if self.prior_tweet_data and \
                dtm.name == self.prior_tweet_data.name and \
                dtm.tweet_text == self.prior_tweet_data.tweet_text:
-               print("MATCH")
                parent_id = self.prior_tweet_data.id
-               print(parent_id)
 
             # Some forms don't exist in thread.
             if dtm.name == self.main_tweet_data.name and \

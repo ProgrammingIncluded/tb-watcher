@@ -15,14 +15,13 @@ from dataclasses import dataclass, asdict
 
 # tb_watcher
 from tb_watcher.logger import logger
+from tb_watcher.threading import T_QUEUE
 
 # selenium
 import selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
@@ -188,12 +187,27 @@ class TweetExtractor:
             self.prev_tweet = tm
             if fetch_threads > 0:
                 logger.debug("Thread depth {}".format(fetch_threads))
-                # TODO, save to file
-                threads = tt.fetch_tweets(
-                    self.max_captures,
-                    load_time,
-                    offset_func
-                )
+                # Spawn a new thread and leave it.
+                current_url = str(driver.current_url)
+                def _new_thread():
+                    new_driver = create_chrome_driver()
+                    new_driver.get(current_url)
+                    try:
+                        tt = TwitterThread(
+                            current_tweet_data,
+                            self.prev_tweet,
+                            self.root_dir,
+                            current_url,
+                            fetch_threads=fetch_threads,
+                            existing_driver=new_driver)
+                        tt.fetch_tweets(
+                            self.max_captures,
+                            load_time,
+                            offset_func
+                        )
+                    finally:
+                        new_driver.close()
+                T_QUEUE.put(_new_thread)
             else:
                 logger.debug("Thread depth reached.")
 
