@@ -18,7 +18,7 @@ sys.path.append(SRC_ROOT)
 import tb_watcher.swag as swag
 
 from tb_watcher.core import fetch_html
-from tb_watcher.logger import logger 
+from tb_watcher.logger import logger
 from tb_watcher.driver_utils import create_chrome_driver
 from tb_watcher.math_utils import calc_average_percentile, window_average, constant
 
@@ -36,6 +36,11 @@ def parse_args():
     runtime_group.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=20, type=int)
     runtime_group.add_argument("--bio-only", "-b", help="Only store bio, no snapshots of tweets.", action="store_true")
     runtime_group.add_argument("--debug", help="Print debug output.", action="store_true")
+    runtime_group.add_argument("--depth", "-d", default=1, type=int, help=("How deep to follow threads on Twitter."
+                                                                           "1 means only main threads on profile."
+                                                                           "2 means threads including responses on each tweet on profile."
+                                                                           "3 means threads of threads. So-on and so-forth."
+                                                                           "Note that duplicates will occur for >= 3."))
 
     verification_group = parser.add_argument_group("verification")
     verification_group.add_argument("--login", help="Prompt user login to remove limits / default filters. USE AT OWN RISK.", action="store_true")
@@ -69,8 +74,13 @@ def main():
         "force": args.force,
         "bio_only": args.bio_only,
         "load_times": args.scroll_load_time,
-        "number_posts_to_cap": args.posts
+        "number_posts_to_cap": args.posts,
+        "fetch_threads": args.depth
     }
+
+    assert args.depth >= 1, "You have to have atleast 1 depth in thread archiving."
+
+    args.output_fpath = args.output_fpath.strip()
 
     if args.debug:
         logger.setLevel(logger.DEBUG)
@@ -95,6 +105,7 @@ def main():
 
     data = []
     if args.url:
+        logger.info("Watching: {}".format(args.url))
         fetch_html(driver, args.url, fpath=args.output_fpath, **extra_args)
     else:
         weird_opening = "window\..* = (\[[\S\s]*)"
@@ -107,12 +118,14 @@ def main():
 
             # Remove the first line metadata
             data = json.loads(txt)
-    
+
         for d in data:
             account = d["following"]
-            fetch_html(driver, account["userLink"], fpath=args.output_fpath, **extra_args)
+            url = account["userLink"]
+            logger.info("Watching: {}".format(url))
+            fetch_html(driver, url, fpath=args.output_fpath, **extra_args)
 
-    logger.info("ALL SCRAPING COMPLETED!")
+    logger.info("ALL SNAPSHOTS COMPLETED!")
 
 if __name__ == "__main__":
     main()
