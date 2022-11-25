@@ -3,10 +3,6 @@ Houses the main logic for fetching data and interfacing with Selenium.
 By: ProgrammingIncluded
 """
 # std
-import os
-import json
-import shutil
-
 from typing import Callable
 
 # bluebird watcher
@@ -32,7 +28,7 @@ def fetch_html(
     # Many thanks to: https://www.scrapingbee.com/blog/web-scraping-twitter/
     # for the inspiration.
     # Major adjustments to make UX a lot smoother.
-    twitter_bio = TwitterBio(fpath, url, existing_driver=driver)
+    twitter_bio = TwitterBio(fpath, url, auto_fetch_threads=True, existing_driver=driver)
     twitter_bio.fetch_metadata()
     if not twitter_bio.write_json(force=force):
         return
@@ -43,5 +39,5 @@ def fetch_html(
     twitter_bio.fetch_tweets(
         number_posts_to_cap,
         load_times,
-        offset_func
+        offset_func,
     )

@@ -135,53 +135,60 @@ class TweetExtractor:
 
         # Determine the id of the tweet by look at it in a separate window
         windows_before  = driver.current_window_handle
+        window_count = len(driver.window_handles)
+        new_window = None
         try:
-            action = webdriver.common.action_chains.ActionChains(driver)
-            action.move_to_element_with_offset(tweet_dom, tweet_dom.size["width"] // 2, 5) \
-                  .key_down(Keys.CONTROL) \
-                  .click() \
-                  .key_up(Keys.CONTROL) \
-                  .perform()
-        except selenium.common.exceptions.ElementClickInterceptedException:
-            # It is okay for clicks to be intercepted.
-            pass
+            try:
+                action = webdriver.common.action_chains.ActionChains(driver)
+                action.move_to_element_with_offset(tweet_dom, tweet_dom.size["width"] // 2, tweet_dom.size["height"] // 2) \
+                    .key_down(Keys.CONTROL) \
+                    .click() \
+                    .key_up(Keys.CONTROL) \
+                    .perform()
+            except selenium.common.exceptions.ElementClickInterceptedException:
+                # It is okay for clicks to be intercepted.
+                pass
 
-        WebDriverWait(driver, 10).until(EC.number_of_windows_to_be(2))
-        windows_after = driver.window_handles
-        all_new_windows = [x for x in windows_after if x != windows_before]
-        driver.switch_to.window(all_new_windows[0])
+            if len(driver.window_handles) == window_count:
+                logger.debug("Attempted to click main thread on: {}".format(tweet_dom))
+                # Selecting the main thread which is not clickable.
+                return None
 
-        # Clicking on a tweet guarantees it to be a TwitterThread page.
-        tm = TwitterThread(self.root_dir, driver.current_url, existing_driver=driver).fetch_metadata()
-        if tm.tweet_text != "NULL":
-            if tm.tweet_text in self.boosted_tracker:
-                # We need to go back in time to find the boosted post!
-                # We match boosts by tweet text.
-                for t in self.tweets_tracker:
-                    if t.tweet_text == tm.tweet_text:
-                        t.potential_boost = True
-                        break
+            new_window = driver.window_handles[-1]
+            driver.switch_to.window(new_window)
 
-            tm.potential_boost = False
-            self.boosted_tracker.add(tm.tweet_text)
-        else:
-            tm.potential_boost = False
+            # Clicking on a tweet guarantees it to be a TwitterThread page.
+            tt = TwitterThread(self.root_dir, driver.current_url, auto_fetch_threads=fetch_threads, existing_driver=driver)
+            tm = tt.fetch_metadata()
+            if tm.tweet_text != "NULL":
+                if tm.tweet_text in self.boosted_tracker:
+                    # We need to go back in time to find the boosted post!
+                    # We match boosts by tweet text.
+                    for t in self.tweets_tracker:
+                        if t.tweet_text == tm.tweet_text:
+                            t.potential_boost = True
+                            break
 
+                tm.potential_boost = False
+                self.boosted_tracker.add(tm.tweet_text)
+            else:
+                tm.potential_boost = False
 
-        if fetch_threads:
-            # TODO, save to file
-            threads = tm.fetch_tweets(
-                self.max_captures,
-                self.load_time,
-                self.offset_func
-            )
+            if fetch_threads:
+                # TODO, save to file
+                threads = tt.fetch_tweets(
+                    self.max_captures,
+                    load_time,
+                    offset_func
+                )
 
-        # Close all non-windows
-        for n in all_new_windows:
-            driver.switch_to.window(n)
-            driver.close()
+        finally:
+            # Close all non-windows
+            if new_window is not None:
+                driver.switch_to.window(new_window)
+                driver.close()
+                driver.switch_to.window(windows_before)
 
-        driver.switch_to.window(windows_before)
         return tm
 
     def capture_all_available_tweets(self, driver: webdriver, fetch_threads: bool, load_time: int, offset_func: Callable) -> List[Tweet]:
@@ -232,8 +239,8 @@ class TweetExtractor:
 
             # Tweet info
             dtm = self.get_tweet(tweet, driver, fetch_threads, load_time, offset_func)
-            # We've seen this post before
-            if dtm in self.tweets_tracker:
+            # We've seen this post before or is invalid tweet.
+            if dtm is None or dtm in self.tweets_tracker:
                 continue
 
             # Create a tweet's folder

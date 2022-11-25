@@ -105,7 +105,6 @@ class TwitterPage:
             # Dump all metadata
             extractor.write_json()
 
-
 class TwitterThread(TwitterPage):
     """
     Class encapsulating a twitter thread page.
@@ -128,7 +127,7 @@ class TwitterThread(TwitterPage):
         while state != "complete":
             time.sleep(random.uniform(3, 5))
             state = self.driver.execute_script("return document.readyState")
-    
+
         WebDriverWait(self.driver, 30).until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, '[data-testid="tweet"]')))
 
@@ -152,7 +151,7 @@ class TwitterThread(TwitterPage):
 
         # Remove initial popups.
         remove_elements(self.driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-    
+
         # delete bottom element
         remove_elements(self.driver, ["BottomBar"])
 
@@ -173,25 +172,25 @@ class TwitterBio(TwitterPage):
         while state != "complete":
             time.sleep(random.uniform(3, 5))
             state = self.driver.execute_script("return document.readyState")
-    
+
         WebDriverWait(self.driver, 30).until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, '[data-testid="tweet"]')))
-    
+
         # Remove initial popups.
         remove_elements(self.driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-    
+
         # delete bottom element
         remove_elements(self.driver, ["BottomBar"])
-    
+
         metadata = {}
         metadata["bio"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserDescription"]').text)
         metadata["name"], metadata["username"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'div[data-testid="UserName"]').text.split('\n'), ("NULL", "NULL"))
         metadata["location"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserLocation"]').text)
         metadata["website"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'a[data-testid="UserUrl"]').text)
         metadata["join_date"] = ensures_or(lambda: self.driver.find_element(By.CSS_SELECTOR,'span[data-testid="UserJoinDate"]').text)
-        metadata["following"] = ensures_or(lambda: self.driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text) 
+        metadata["following"] = ensures_or(lambda: self.driver.find_element(By.XPATH, "//span[contains(text(), 'Following')]/ancestor::a/span").text)
         metadata["followers"] = ensures_or(lambda: self.driver.find_element(By.XPATH, "//span[contains(text(), 'Followers')]/ancestor::a/span").text)
-    
+
         if metadata.get("username", "NULL") == "NULL":
             raise RuntimeError("Fatal error, unable to resolve username {}".format(metadata))
 
@@ -209,21 +208,21 @@ class TwitterBio(TwitterPage):
         username = self.metadata.username
         assert self.metadata.username[0] == "@"
         username = username[1:]
-    
-        fpath = os.path.join(self.root_dir, username) 
+
+        fpath = os.path.join(self.root_dir, username)
         if not force and os.path.exists(fpath):
             logger.info("Folder already exists, skipping: {}".format(fpath))
             return False
         elif force and os.path.exists(fpath):
             shutil.rmtree(fpath)
-    
+
         os.makedirs(fpath)
-    
+
         # Force utf-8
         # Save a copy of the metadata
         with open(os.path.join(fpath, "metadata.json"), "w", encoding="utf-8") as f:
             json.dump(self.get_bio_as_dict(), f, ensure_ascii=False)
-    
+
         # Save a screen shot of the bio
         self.driver.save_screenshot(os.path.join(fpath, "profile.png"))
         return True
