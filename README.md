@@ -19,7 +19,7 @@ This script is purely for the purposes of archival use only.
 
 * Stores metadata in json format for each specified twitter profile.
 * Neatly organizes tweets by user and takes a snapshot of each tweet.
-* Auto snapshots thread replies and reponses by depth relative to original tweet.
+* Auto snapshots thread replies and reponses. Saves structure of replies.
 * Marks potential tweets that are self-retweeted.
 * Allows for manual login (use at own risk.)
 * Removes Tweet Ads.
@@ -107,7 +107,8 @@ You can rename as json or specify via input flags to parse the file. `window.* =
         "retweet_count": str,
         "like_count": str,
         "reply_count": str,
-        "potential_boost":  bool
+        "potential_boost":  bool,
+        "parent_id": str | null
     }
 ]
 ```

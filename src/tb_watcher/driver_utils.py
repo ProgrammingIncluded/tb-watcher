@@ -9,9 +9,8 @@ import time
 import json
 import random
 from abc import abstractmethod
-from urllib.parse import urlparse
 
-from typing import Callable, List
+from typing import Callable, List, Union
 from dataclasses import dataclass, asdict
 
 # tb_watcher
@@ -56,6 +55,7 @@ class Tweet(Unique):
     like_count: str
     reply_count: str
     potential_boost: bool
+    parent_id: Union[str, None]
 
     def get_url(self):
         return "https://www.twitter.com/{clean_handle}/status/{id}".format(self.handle[1:], self.id)
@@ -84,7 +84,7 @@ class MaxCapturesReached(RuntimeError):
 
 def tweet_dom_get_basic_metadata(tweet_dom):
     """Retrieves all metadata from tweet dom except unique id."""
-    tm = {"id": "null"}
+    tm = {"id": "null", "parent_id": None}
     tm["tag_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
     try:
         splts = str(tm["tag_text"]).split("\n")
@@ -119,6 +119,8 @@ class TweetExtractor:
         self.boosted_tracker = set() # Used for tracking boosted tweets by saving tweet texts.
         self.recommended_tweets_height = None
 
+        # Used for chaining tweets as threads.
+        self.prev_tweet = None
         self.tweets_tracker = set()
         self.root_dir = root_dir
         self.max_captures = max_captures
@@ -167,7 +169,7 @@ class TweetExtractor:
             driver.switch_to.window(new_window)
 
             # Clicking on a tweet guarantees it to be a TwitterThread page.
-            tt = TwitterThread(current_tweet_data, self.root_dir, driver.current_url, fetch_threads=fetch_threads, existing_driver=driver)
+            tt = TwitterThread(current_tweet_data, self.prev_tweet, self.root_dir, driver.current_url, fetch_threads=fetch_threads, existing_driver=driver)
             tm = tt.fetch_metadata()
             if tm.tweet_text != "NULL":
                 if tm.tweet_text in self.boosted_tracker:
@@ -183,6 +185,7 @@ class TweetExtractor:
             else:
                 tm.potential_boost = False
 
+            self.prev_tweet = tm
             if fetch_threads > 0:
                 logger.debug("Thread depth {}".format(fetch_threads))
                 # TODO, save to file

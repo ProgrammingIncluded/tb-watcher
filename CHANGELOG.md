@@ -21,6 +21,7 @@
 ## 0.6.0: Twitter Thread Support
 
 * Added `--depth` and `-d` for archiving threads.
+* Added `parent_id` to `tweets.json` which tracks direct tweet responses.
 * Added `pages.py` which abstracts away a page on Twitter. Useful for multi-threading.
     * Added `TwitterPage` used for representing a page in Twitter.
     * Added `TwitterBio` which is used for fetching and obtaining bio pages.
