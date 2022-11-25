@@ -21,9 +21,10 @@
 ## 0.6.0: Twitter Thread Support
 
 * Added `--depth` and `-d` for archiving threads.
-* Added `TwitterPage` used for representing a page in Twitter.
-* Added `TwitterBio` which is used for fetching and obtaining bio pages.
-* Added `TwitterThread` which represents a tweet thread page.
+* Added `pages.py` which abstracts away a page on Twitter. Useful for multi-threading.
+    * Added `TwitterPage` used for representing a page in Twitter.
+    * Added `TwitterBio` which is used for fetching and obtaining bio pages.
+    * Added `TwitterThread` which represents a tweet thread page.
 * Added `TweetExtractor` which attempts to fetch all available Tweets on a page.
 * Added `Scroller` which abstracts away scrolling metrics.
 * Added thread expansion functions: `hit_more_replies()` and `get_recommend_tweets_height()`.
