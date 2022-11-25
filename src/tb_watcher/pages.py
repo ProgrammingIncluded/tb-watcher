@@ -11,6 +11,7 @@ import random
 import time
 import json
 import shutil
+import threading
 
 from abc import abstractmethod
 from typing import Callable, List
@@ -20,8 +21,7 @@ from urllib.parse import urlparse
 # tb_watcher
 from tb_watcher.logger import logger
 from tb_watcher.driver_utils import (BioMetadata, MaxCapturesReached, Scroller, TweetExtractor, Tweet,
-                                     ensures_or, remove_elements, create_chrome_driver, tweet_dom_get_basic_metadata,
-                                     hit_more_replies, get_recommend_tweets_height)
+                                     ensures_or, remove_elements, create_chrome_driver, tweet_dom_get_basic_metadata)
 
 # selenium
 import selenium
@@ -29,6 +29,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+
 
 class TwitterPage:
     """Interface for a page on Twitter.
@@ -112,8 +113,9 @@ class TwitterThread(TwitterPage):
     Also used to resolve Tweet ID as a thread will contain
     the Tweet's ID.
     """
-    def __init__(self, main_tweet_data: Tweet, *args, **kwargs):
+    def __init__(self, main_tweet_data: Tweet, prior_tweet_data: Tweet, *args, **kwargs):
         self.main_tweet_data = main_tweet_data
+        self.prior_tweet_data = prior_tweet_data
         # Force auto fetching threads to false to prevent recursion.
         super().__init__(*args, **kwargs)
 
@@ -134,9 +136,16 @@ class TwitterThread(TwitterPage):
         tweets = self.driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
 
         main_tweet = None
+        parent_id = None
         # Not every tweet on the metadata we want. Keep iterating until we find it.
         for t in tweets:
             dtm = tweet_dom_get_basic_metadata(t)
+            # Check if this tweet is a parent, if so, we can mark it as a parent tweet.
+            if self.prior_tweet_data and \
+               dtm.name == self.prior_tweet_data.name and \
+               dtm.tweet_text == self.prior_tweet_data.tweet_text:
+               parent_id = self.prior_tweet_data.id
+
             # Some forms don't exist in thread.
             if dtm.name == self.main_tweet_data.name and \
                dtm.tweet_text == self.main_tweet_data.tweet_text:
@@ -151,9 +160,11 @@ class TwitterThread(TwitterPage):
         # Grab unique tweet id
         assert "status/" in raw_url, "Is this a valid status URL?: {}".format(raw_url)
         path = urlparse(raw_url).path
-        post_url =path.split("status/")[-1]
+        post_url = path.split("status/")[-1]
         dtm.id = post_url.split("/")[0]
 
+        # Set parent_id if we found it.
+        dtm.parent_id = parent_id
         self.metadata = dtm
 
         # Create a folder to house pictures, etc.
