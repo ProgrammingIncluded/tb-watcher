@@ -17,7 +17,6 @@ from abc import abstractmethod
 from typing import Callable, List
 from dataclasses import asdict
 from urllib.parse import urlparse
-from queue import Queue
 
 # tb_watcher
 from tb_watcher.logger import logger

@@ -24,6 +24,8 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 def ensures_or(f: str, otherwise: str = "NULL"):
     try:
@@ -121,6 +123,7 @@ class TweetExtractor:
         # Used for chaining tweets as threads.
         self.prev_tweet = None
         self.tweets_tracker = set()
+        self.tweets_ordered = []
         self.root_dir = root_dir
         self.max_captures = max_captures
 
@@ -192,6 +195,15 @@ class TweetExtractor:
                 def _new_thread():
                     new_driver = create_chrome_driver()
                     new_driver.get(current_url)
+
+                    # Wait for driver oload new page
+                    state = ""
+                    while state != "complete":
+                        time.sleep(random.uniform(3, 5))
+                        state = new_driver.execute_script("return document.readyState")
+
+                    WebDriverWait(new_driver, 30).until(EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, '[data-testid="tweet"]')))
                     try:
                         tt = TwitterThread(
                             current_tweet_data,
@@ -301,6 +313,7 @@ class TweetExtractor:
                 # Create a tweet's folder
                 self.counter += 1
                 self.tweets_tracker.add(full_dtm)
+                self.tweets_ordered.append(full_dmt)
 
                 if self.max_captures and self.counter > self.max_captures:
                     exit_loop = True
@@ -308,7 +321,7 @@ class TweetExtractor:
 
     def get_tweets_as_dict(self) -> List[dict]:
         results = []
-        for t in self.tweets_tracker:
+        for t in self.tweets_ordered:
             results.append(asdict(t))
         return results
 
@@ -417,4 +430,6 @@ def create_chrome_driver() -> webdriver:
     """Creates a chrome driver with silenced warnings and custom options."""
     options = webdriver.ChromeOptions()
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
-    return webdriver.Chrome(options=options, service=Service(ChromeDriverManager().install()))
+    driver = webdriver.Chrome(options=options, service=Service(ChromeDriverManager().install()))
+    driver.set_window_size(1200, 1200)
+    return driver

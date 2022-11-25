@@ -10,7 +10,7 @@ from typing import Callable
 # bluebird watcher
 from tb_watcher.logger import logger
 from tb_watcher.pages import TwitterBio
-from tb_watcher.threading import T_QUEUE, spawn_threads
+from tb_watcher.threading import T_QUEUE, spawn_threads, BUSY_THREADS, BUSY_LOCK
 
 # selenium
 from selenium import webdriver
@@ -24,7 +24,8 @@ def fetch_html(
     fetch_threads: int,
     force: bool = False,
     number_posts_to_cap: int = 20,
-    bio_only: bool = False):
+    bio_only: bool = False,
+    num_threads: int = 4):
     """Primary driver of the program."""
 
     spawn_threads()
@@ -45,8 +46,12 @@ def fetch_html(
     )
 
     # Wait for any remaining pending jobs
-    while T_QUEUE.not_empty:
-        time.sleep(1)
 
+    while True:
+        if T_QUEUE.qsize() == 0:
+            with BUSY_LOCK:
+                if BUSY_THREADS == 0:
+                    break
+        time.sleep(5)
     # Daemon threads will terminate when main thread is terminated.
     logger.info("All jobs finished! Terminating main thread.")
