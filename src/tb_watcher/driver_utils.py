@@ -262,8 +262,8 @@ class TweetExtractor:
                     driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
 
                     height = float(driver.execute_script("return window.scrollTop || window.pageYOffset;"))
-                    print("HEIGHT: {}".format(height))
-                    print("RECOMMEND: {}".format(self.recommended_tweets_height))
+                    logger.debug("HEIGHT: {}".format(height))
+                    logger.debug("RECOMMEND HEIGHT: {}".format(self.recommended_tweets_height))
                     # Verify that we are not in the recommended tweets section, if so, fail.
                     if self.recommended_tweets_height and height >= self.recommended_tweets_height - 10:
                         logger.debug("Hit recommended tweets section! Skipping.")
@@ -279,7 +279,6 @@ class TweetExtractor:
                 full_dtm = self.get_tweet(tweet, driver, fetch_threads, load_time, offset_func)
                 # We've seen this post before or is invalid tweet.
                 if full_dtm is None or full_dtm in self.tweets_tracker:
-                    print("NANI")
                     continue
 
                 # Create a tweet's folder
@@ -287,7 +286,6 @@ class TweetExtractor:
                 self.tweets_tracker.add(full_dtm)
 
                 if self.max_captures and self.counter > self.max_captures:
-                    print("CAPS")
                     exit_loop = True
                     break
 

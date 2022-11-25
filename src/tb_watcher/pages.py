@@ -81,7 +81,6 @@ class TwitterPage:
         try:
             time.sleep(random.uniform(load_time, load_time + 2))
             for _ in Scroller(self.driver, extractor.create_offset_function(offset_func), load_time):
-                print("SCROLL")
                 if last_id_count > 5:
                     logger.debug("No more data to load?")
                     break
