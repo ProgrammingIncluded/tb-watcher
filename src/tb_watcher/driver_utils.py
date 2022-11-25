@@ -87,7 +87,12 @@ def tweet_dom_get_basic_metadata(tweet_dom):
     tm = {"id": "null"}
     tm["tag_text"] = ensures_or(lambda: tweet_dom.find_element(By.CSS_SELECTOR,'div[data-testid="User-Names"]').text)
     try:
-        tm["name"], tm["handle"], _, tm["timestamp"] = ensures_or(lambda: tm["tag_text"].split('\n'), tuple(["UKNOWN" for _ in range(4)]))
+        splts = str(tm["tag_text"]).split("\n")
+        if len(splts) == 2:
+            tm["name"], tm["handle"] = splts
+            tm["timestamp"] = "ERR"
+        else:
+            tm["name"], tm["handle"], _, tm["timestamp"] = splts
     except Exception as e:
         tm["name"], tm["handle"], tm["timestamp"] = tm["tag_text"], "ERR", "ERR"
 
@@ -112,6 +117,7 @@ class TweetExtractor:
         self.height_diffs = []
         self.div_track = set() # Used for tracking unique ids between tweet scraping.
         self.boosted_tracker = set() # Used for tracking boosted tweets by saving tweet texts.
+        self.recommended_tweets_height = None
 
         self.tweets_tracker = set()
         self.root_dir = root_dir
@@ -128,7 +134,7 @@ class TweetExtractor:
         with open(os.path.join(self.root_dir, "tweets.json"), "w", encoding="utf-8") as f:
             json.dump(self.get_tweets_as_dict(), f, ensure_ascii=False)
 
-    def get_tweet(self, tweet_dom, driver: webdriver, fetch_threads: bool, load_time: int, offset_func: Callable) -> Tweet:
+    def get_tweet(self, tweet_dom, driver: webdriver, fetch_threads: int, load_time: int, offset_func: Callable) -> Tweet:
         # Lazy load because of circular dependencies.
         # this can be avoided if we pull out the logic at some point.
         from tb_watcher.pages import TwitterThread
@@ -137,10 +143,13 @@ class TweetExtractor:
         windows_before  = driver.current_window_handle
         window_count = len(driver.window_handles)
         new_window = None
+
+        # When we move to a new page, this is the target data we want to obtain
+        current_tweet_data = tweet_dom_get_basic_metadata(tweet_dom)
         try:
             try:
                 action = webdriver.common.action_chains.ActionChains(driver)
-                action.move_to_element_with_offset(tweet_dom, tweet_dom.size["width"] // 2, tweet_dom.size["height"] // 2) \
+                action.move_to_element_with_offset(tweet_dom, tweet_dom.size["width"] // 2, 5) \
                     .key_down(Keys.CONTROL) \
                     .click() \
                     .key_up(Keys.CONTROL) \
@@ -158,7 +167,7 @@ class TweetExtractor:
             driver.switch_to.window(new_window)
 
             # Clicking on a tweet guarantees it to be a TwitterThread page.
-            tt = TwitterThread(self.root_dir, driver.current_url, auto_fetch_threads=fetch_threads, existing_driver=driver)
+            tt = TwitterThread(current_tweet_data, self.root_dir, driver.current_url, fetch_threads=fetch_threads, existing_driver=driver)
             tm = tt.fetch_metadata()
             if tm.tweet_text != "NULL":
                 if tm.tweet_text in self.boosted_tracker:
@@ -174,13 +183,16 @@ class TweetExtractor:
             else:
                 tm.potential_boost = False
 
-            if fetch_threads:
+            if fetch_threads > 0:
+                logger.debug("Thread depth {}".format(fetch_threads))
                 # TODO, save to file
                 threads = tt.fetch_tweets(
                     self.max_captures,
                     load_time,
                     offset_func
                 )
+            else:
+                logger.debug("Thread depth reached.")
 
         finally:
             # Close all non-windows
@@ -190,6 +202,14 @@ class TweetExtractor:
                 driver.switch_to.window(windows_before)
 
         return tm
+
+    def update_recommended_tweets_height(self, driver: webdriver, force: bool=False):
+        """Only update if we have seen recommended tweets."""
+        # We should update if more replies were generated.
+        if force or self.recommended_tweets_height is None:
+            h = get_recommend_tweets_height(driver)
+            if h is not None:
+                self.recommended_tweets_height = h
 
     def capture_all_available_tweets(self, driver: webdriver, fetch_threads: bool, load_time: int, offset_func: Callable) -> List[Tweet]:
         """
@@ -208,47 +228,68 @@ class TweetExtractor:
         if self.max_captures and self.counter >= self.max_captures:
             raise MaxCapturesReached()
 
-        tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
-        for tweet in tweets:
-            try:
-                ad = remove_ads(driver)
-                remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
-                if ad:
+        force_update = hit_more_replies(driver)
+        self.update_recommended_tweets_height(driver, force_update)
+        # Makesure we haven't hit recommended tweets section
+        exit_loop = False
+        while not exit_loop:
+            tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
+            for tweet in tweets:
+                try:
+                    ad = remove_ads(driver)
+                    remove_elements(driver, ["sheetDialog", "confirmationSheetDialog", "mask"])
+                    if ad:
+                        logger.debug("AD SKIP {}".format(ad))
+                        continue
+
+                    force_update = hit_more_replies(driver)
+                    self.update_recommended_tweets_height(driver, force_update)
+                    # Force update if we hit reply to get latest values.
+                    if force_update:
+                        logger.debug("More replies hit, reloading tweets.")
+                        break
+
+                    # To save potential duplicates, we check
+                    # first a unique id via tags to see if
+                    # we can skip prior to heavy post-processing.
+                    div_id = tweet.get_attribute("aria-labelledby")
+                    if div_id in self.div_track:
+                        logger.debug("DIV SKIP {}".format(div_id))
+                        continue
+
+                    self.div_track.add(div_id)
+                    driver.execute_script("return arguments[0].scrollIntoView();", tweet)
+                    driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
+
+                    height = float(driver.execute_script("return window.scrollTop || window.pageYOffset;"))
+                    print("HEIGHT: {}".format(height))
+                    print("RECOMMEND: {}".format(self.recommended_tweets_height))
+                    # Verify that we are not in the recommended tweets section, if so, fail.
+                    if self.recommended_tweets_height and height >= self.recommended_tweets_height - 10:
+                        logger.debug("Hit recommended tweets section! Skipping.")
+                        exit_loop = True
+                        break
+                except Exception as e:
+                    logger.warning(e)
+
+                self.height_diffs.append(height - self.prev_height)
+                self.prev_height = height
+
+                # Tweet info
+                full_dtm = self.get_tweet(tweet, driver, fetch_threads, load_time, offset_func)
+                # We've seen this post before or is invalid tweet.
+                if full_dtm is None or full_dtm in self.tweets_tracker:
+                    print("NANI")
                     continue
 
-                # To save potential duplicates, we check
-                # first a unique id via tags to see if
-                # we can skip prior to heavy post-processing.
-                div_id = tweet.get_attribute("aria-labelledby")
-                if div_id in self.div_track:
-                    continue
+                # Create a tweet's folder
+                self.counter += 1
+                self.tweets_tracker.add(full_dtm)
 
-                self.div_track.add(div_id)
-                driver.execute_script("return arguments[0].scrollIntoView();", tweet)
-                driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
-            except:
-                continue
-
-            # If there was no scroll while targeting the next element or the scroll is
-            # smaller than the prior, then we hit a duplicate and we skip.
-            height = float(driver.execute_script("return window.scrollTop || window.pageYOffset;"))
-            if height < self.prev_height:
-                continue
-            self.height_diffs.append(height - self.prev_height)
-            self.prev_height = height
-
-            # Tweet info
-            dtm = self.get_tweet(tweet, driver, fetch_threads, load_time, offset_func)
-            # We've seen this post before or is invalid tweet.
-            if dtm is None or dtm in self.tweets_tracker:
-                continue
-
-            # Create a tweet's folder
-            self.counter += 1
-            self.tweets_tracker.add(dtm)
-
-            if self.max_captures and self.counter > self.max_captures:
-                break
+                if self.max_captures and self.counter > self.max_captures:
+                    print("CAPS")
+                    exit_loop = True
+                    break
 
     def get_tweets_as_dict(self) -> List[dict]:
         results = []
@@ -325,6 +366,36 @@ def remove_ads(driver: webdriver) -> bool:
             return true;
         }
         return false;
+    """)
+
+def hit_more_replies(driver: webdriver):
+    """Hits both thread wide and per-thread responses."""
+    xpaths = [
+        driver.find_elements("xpath", "//*[contains(text(), 'Show replies')]"),
+        driver.find_elements("xpath", "//*[contains(text(), 'Show more replies')]")
+    ]
+
+    return_result = False
+    for dom in xpaths:
+        for r in dom:
+            try:
+                r.click()
+                return_result |= True
+                time.sleep(0.3)
+            except selenium.common.exceptions.ElementNotInteractableException as e:
+                pass
+
+    return return_result
+
+def get_recommend_tweets_height(driver: webdriver):
+    return driver.execute_script("""
+        var elems = document.querySelectorAll("*"),
+            res = Array.from(elems).find(v => v.textContent == 'More Tweets');
+
+        if (res) {
+            return res.getBoundingClientRect().top + window.scrollY;
+        }
+        return null;
     """)
 
 def create_chrome_driver() -> webdriver:

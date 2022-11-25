@@ -20,15 +20,14 @@ def fetch_html(
     fpath: str,
     load_times: float,
     offset_func: Callable,
+    fetch_threads: int,
     force: bool = False,
     number_posts_to_cap: int = DEF_NUM_TWEETS,
     bio_only: bool = False):
     """Primary driver of the program."""
 
-    # Many thanks to: https://www.scrapingbee.com/blog/web-scraping-twitter/
-    # for the inspiration.
-    # Major adjustments to make UX a lot smoother.
-    twitter_bio = TwitterBio(fpath, url, auto_fetch_threads=True, existing_driver=driver)
+    # We add one to the fetch_threads as we need to include the thread id themselves.
+    twitter_bio = TwitterBio(fpath, url, fetch_threads=fetch_threads + 1, existing_driver=driver)
     twitter_bio.fetch_metadata()
     if not twitter_bio.write_json(force=force):
         return

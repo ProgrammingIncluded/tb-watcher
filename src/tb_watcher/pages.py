@@ -20,7 +20,8 @@ from urllib.parse import urlparse
 # tb_watcher
 from tb_watcher.logger import logger
 from tb_watcher.driver_utils import (BioMetadata, MaxCapturesReached, Scroller, TweetExtractor, Tweet,
-                                     ensures_or, remove_elements, create_chrome_driver, tweet_dom_get_basic_metadata)
+                                     ensures_or, remove_elements, create_chrome_driver, tweet_dom_get_basic_metadata,
+                                     hit_more_replies, get_recommend_tweets_height)
 
 # selenium
 import selenium
@@ -33,10 +34,10 @@ class TwitterPage:
     """Interface for a page on Twitter.
     Each page can allow for a driveer to optimize multi-threading.
     """
-    def __init__(self, root_dir: str, url: str, *args, auto_fetch_threads=False, existing_driver: webdriver = None, **kwargs):
+    def __init__(self, root_dir: str, url: str, fetch_threads: int, existing_driver: webdriver = None):
         self.metadata = None
         self.root_dir = root_dir
-        self.auto_fetch_threads = auto_fetch_threads
+        self.fetch_threads = fetch_threads
 
         if existing_driver:
             self.driver = existing_driver
@@ -80,6 +81,7 @@ class TwitterPage:
         try:
             time.sleep(random.uniform(load_time, load_time + 2))
             for _ in Scroller(self.driver, extractor.create_offset_function(offset_func), load_time):
+                print("SCROLL")
                 if last_id_count > 5:
                     logger.debug("No more data to load?")
                     break
@@ -92,7 +94,7 @@ class TwitterPage:
                     last_id_count = 0
 
                 # Capture the tweets and generates files for them
-                extractor.capture_all_available_tweets(self.driver, self.auto_fetch_threads, load_time, offset_func)
+                extractor.capture_all_available_tweets(self.driver, self.fetch_threads - 1, load_time, offset_func)
         except selenium.common.exceptions.StaleElementReferenceException as e:
             logger.warning("Tweet limit reached, for {} unable to fetch more data. Authentication is required.".format(self.metadata.username))
             logger.warning("Or you can try to bump loading times.")
@@ -111,10 +113,9 @@ class TwitterThread(TwitterPage):
     Also used to resolve Tweet ID as a thread will contain
     the Tweet's ID.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, main_tweet_data: Tweet, *args, **kwargs):
+        self.main_tweet_data = main_tweet_data
         # Force auto fetching threads to false to prevent recursion.
-        auto_fetch_threads = kwargs.get("auto_fetch_threads", False)
-        kwargs["auto_fetch_threads"] = auto_fetch_threads
         super().__init__(*args, **kwargs)
 
     def fetch_metadata(self) -> Tweet:
@@ -131,11 +132,22 @@ class TwitterThread(TwitterPage):
         WebDriverWait(self.driver, 30).until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, '[data-testid="tweet"]')))
 
-        # We only want the first tweet of the page which is the main tweet
-        # don't use TweetExtractor as internally it calls this function for metadata of the tweet.
         tweets = self.driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
-        main_tweet = tweets[0]
-        dtm = tweet_dom_get_basic_metadata(main_tweet)
+
+        main_tweet = None
+        # Not every tweet on the metadata we want. Keep iterating until we find it.
+        for t in tweets:
+            dtm = tweet_dom_get_basic_metadata(t)
+            # Some forms don't exist in thread.
+            if dtm.name == self.main_tweet_data.name and \
+               dtm.tweet_text == self.main_tweet_data.tweet_text:
+                main_tweet = t
+                break
+
+        assert main_tweet is not None, "There should be a valid tweet in thread page."
+        # Scroll to tweet.
+        self.driver.execute_script("return arguments[0].scrollIntoView();", main_tweet)
+        self.driver.execute_script("window.scrollTo(0, window.pageYOffset - 50);")
 
         # Grab unique tweet id
         assert "status/" in raw_url, "Is this a valid status URL?: {}".format(raw_url)

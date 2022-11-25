@@ -19,9 +19,10 @@ This script is purely for the purposes of archival use only.
 
 * Stores metadata in json format for each specified twitter profile.
 * Neatly organizes tweets by user and takes a snapshot of each tweet.
+* Auto snapshots thread replies and reponses by depth relative to original tweet.
 * Marks potential tweets that are self-retweeted.
-* Removes Tweet Ads.
 * Allows for manual login (use at own risk.)
+* Removes Tweet Ads.
 
 ## Usage
 
@@ -32,6 +33,9 @@ python -m pip install -r requirements.txt
 # Take a snapshot from a given profile URL.
 python bin/watcher.py --url www.twitter.com/<profile>
 
+# Take a snapshot of profile tweets and their replies
+python bin/watcher.py --url www.twitter.com/<profile> -d 2
+
 # For more help use:
 python bin/watcher.py --help
 ```
@@ -40,21 +44,26 @@ Tested on Python 3.10.
 
 ### Output
 
-Birdwatch generates the following in the snapshots folder:
+TBwatch generates the following in the snapshots folder (assuming `--depth 2`):
 
 ```
 └───snapshots
     └───<user_id>           # Username
         │   metadata.json   # profile metadata
         │   profile.png     # snapshot of profile page
+        │   tweets.json     # text format of all tweets on profile page
         │
-        └───tweets
-                0.png       # snapshot of latest tweet
-                1.png
-                ...
-                9.png
-                tweets.json # Metadata of each screen-capped tweet.
+        └───<prof_tweet_id_0>
+            │   <prof_tweet_id_0>.png  # Snapshot
+            │   tweets.json            # Responses to <prof_tweet_id_0>
+            │
+            ├───<response_tweet_id_0>
+            │       <response_tweet_id_0>.png # Snapshot
+            │
+            └───<response_tweet_id_1>
+                    <response_tweet_id_1>.png # Snapshot
 ```
+
 
 ### Self Boosted Tweet Detection
 
@@ -103,6 +112,7 @@ You can rename as json or specify via input flags to parse the file. `window.* =
 ]
 ```
 
+`id` is the index assigned by Twitter.
 Invalid string entries will be marked as "NULL".
 
 ###  metadata.json
@@ -121,7 +131,6 @@ Invalid string entries will be marked as "NULL".
 ```
 
 Invalid string entries will be marked as "NULL".
-
 
 ## Troubleshoot
 

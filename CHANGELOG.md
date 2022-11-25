@@ -18,8 +18,9 @@
 
 # Changes
 
-## vNEXT
+## 0.6.0: Twitter Thread Support
 
+* Added `--depth` and `-d` for archiving threads.
 * Added `TwitterPageInterface` used for representing a page in Twitter.
 * Added `TwitterBio` which is used for fetching and obtaining bio pages.
 * Added `TweetFetcher` which attempts to fetch all available Tweets on a page.
