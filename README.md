@@ -13,16 +13,16 @@ Supports UTF-8 text JSON files and image snapshots of each Twitter post!
 
 This script is purely for the purposes of archival use only.
 
-![TBirdwatcher](demo.gif)
+![TBWatcher](demo.gif)
 
-## Features
+## Quick Highlights
 
-* Stores metadata in json format for each specified twitter profile.
-* Neatly organizes tweets by user and takes a snapshot of each tweet.
-* Auto snapshots thread replies and reponses. Saves structure of replies.
-* Marks potential tweets that are self-retweeted.
-* Allows for manual login (use at own risk.)
-* Removes Tweet Ads.
+* ⚡ Multi-threaded!
+* 🗄️ Neatly stores metadata in json format for each specified twitter profile.
+* 📸 Snapshots tweets, thread replies, and reponses.
+* ♻️ Marks potential tweets that are self-retweeted.
+* 🚩 Removes Tweet Ads.
+* 🖥️ Allows for manual login (use at own risk.)
 
 ## Usage
 
@@ -64,6 +64,17 @@ TBwatch generates the following in the snapshots folder (assuming `--depth 2`):
                     <response_tweet_id_1>.png # Snapshot
 ```
 
+## Detailed Highlights
+
+### Multi-Threading
+
+By default, multi-threading is enabled and proportional to the number of cores on your computer.
+Each thread spawns a unique window. Resist the urget to resize the windows as it can mess up the renders.
+But you can move the windows around.
+
+If you find yourself out of memory, consider lowering the number of threads.
+
+![Multi-threading](multi_threading.gif)
 
 ### Self Boosted Tweet Detection
 
@@ -142,6 +153,18 @@ Or your scrolling height is too low / too high. Consider using `--scroll-algorit
 Then passing in a value to the algorithm `--scroll-value`.
 
 "--help" has more information as to what `--scroll-value` encodes.
+
+* `TBWatcher` does not scrape anything or tweet cut-off?
+
+Try to run with `--debug` and see if there are any "Unable to locate element" errors.
+If so, your render window size may be a bit too small. Under-the-hood we use Chrome
+to render tweets, which requires a browser window size that is sufficiently large.
+
+Try to modify `--window-size` such that each tweet is clearly rendered.
+
+* Out of memory issues?
+
+Each thread spawns a unique Chrome window. Try reducing number of threads with `-t` / `--multi-threading`.
 
 ## Contributing
 

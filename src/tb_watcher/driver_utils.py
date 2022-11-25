@@ -15,7 +15,7 @@ from dataclasses import dataclass, asdict
 
 # tb_watcher
 from tb_watcher.logger import logger
-from tb_watcher.threading import T_QUEUE
+from tb_watcher.threading import add_job
 
 # selenium
 import selenium
@@ -26,6 +26,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+
+DEF_WINDOW_SIZE = (800, 1440)
 
 def ensures_or(f: str, otherwise: str = "NULL"):
     try:
@@ -192,18 +194,21 @@ class TweetExtractor:
                 logger.debug("Thread depth {}".format(fetch_threads))
                 # Spawn a new thread and leave it.
                 current_url = str(driver.current_url)
-                def _new_thread():
-                    new_driver = create_chrome_driver()
-                    new_driver.get(current_url)
+                def _new_thread(is_new_thread: bool):
+                    if is_new_thread:
+                        new_driver = create_chrome_driver()
+                        new_driver.get(current_url)
+                        # Wait for driver oload new page
+                        state = ""
+                        while state != "complete":
+                            time.sleep(random.uniform(3, 5))
+                            state = new_driver.execute_script("return document.readyState")
 
-                    # Wait for driver oload new page
-                    state = ""
-                    while state != "complete":
-                        time.sleep(random.uniform(3, 5))
-                        state = new_driver.execute_script("return document.readyState")
+                        WebDriverWait(new_driver, 30).until(EC.presence_of_element_located(
+                            (By.CSS_SELECTOR, '[data-testid="tweet"]')))
+                    else:
+                        new_driver = driver
 
-                    WebDriverWait(new_driver, 30).until(EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, '[data-testid="tweet"]')))
                     try:
                         tt = TwitterThread(
                             current_tweet_data,
@@ -218,8 +223,9 @@ class TweetExtractor:
                             offset_func
                         )
                     finally:
-                        new_driver.close()
-                T_QUEUE.put(_new_thread)
+                        if is_new_thread:
+                            new_driver.close()
+                add_job(_new_thread)
             else:
                 logger.debug("Thread depth reached.")
 
@@ -313,7 +319,7 @@ class TweetExtractor:
                 # Create a tweet's folder
                 self.counter += 1
                 self.tweets_tracker.add(full_dtm)
-                self.tweets_ordered.append(full_dmt)
+                self.tweets_ordered.append(full_dtm)
 
                 if self.max_captures and self.counter > self.max_captures:
                     exit_loop = True
@@ -431,5 +437,5 @@ def create_chrome_driver() -> webdriver:
     options = webdriver.ChromeOptions()
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
     driver = webdriver.Chrome(options=options, service=Service(ChromeDriverManager().install()))
-    driver.set_window_size(1200, 1200)
+    driver.set_window_size(*DEF_WINDOW_SIZE)
     return driver

@@ -87,7 +87,7 @@ def main():
     }
 
     assert args.depth >= 1, "You have to have atleast 1 depth in thread archiving."
-    assert args.multi_threading > 1 and not args.login, "Login feature only works on single thread."
+    assert (args.multi_threading == 1) or (args.multi_threading > 1 and not args.login), "Login feature only works on single thread."
 
     args.output_fpath = args.output_fpath.strip()
 

@@ -160,7 +160,7 @@ class TwitterThread(TwitterPage):
         # Grab unique tweet id
         assert "status/" in raw_url, "Is this a valid status URL?: {}".format(raw_url)
         path = urlparse(raw_url).path
-        post_url =path.split("status/")[-1]
+        post_url = path.split("status/")[-1]
         dtm.id = post_url.split("/")[0]
 
         # Set parent_id if we found it.
