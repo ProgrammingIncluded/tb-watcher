@@ -4,10 +4,11 @@ By: ProgrammingIncluded
 """
 import logging
 
+LOG_FORMAT = "[%(asctime)s][%(name)s][%(levelname)s] %(message)s"
+logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger("tb_watcher")
-s_handler = logging.StreamHandler()
+logger.setLevel(logging.INFO)
 
-# Default severity level
-s_handler.setLevel(logging.WARNING)
-formatter = logging.Formatter("[%(name)s][%(levelname)s] %(message)s")
-s_handler.setFormatter(formatter)
+# Pass-thru
+logger.INFO = logging.INFO
+logger.DEBUG = logging.DEBUG

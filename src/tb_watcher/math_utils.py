@@ -27,7 +27,7 @@ def window_average(window: int) -> Callable:
         v = lst[:-min(window, len(lst))]
 
         if len(v) == 0:
-            return lst[-1]
+            return 0
 
         return sum(v) / len(v)
     return _func

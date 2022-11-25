@@ -18,6 +18,24 @@
 
 # Changes
 
+## 0.6.0: Threaded Update
+
+* Added `--depth` and `-d` for archiving threads.
+* Added `--multi-threading` and `-t` to specify number of threads to use.
+* Added `parent_id` to `tweets.json` which tracks direct tweet responses.
+* Added `threading.py` which manages thread workers and queues.
+* Added `pages.py` which abstracts away a page on Twitter. Useful for multi-threading.
+    * Added `TwitterPage` used for representing a page in Twitter.
+    * Added `TwitterBio` which is used for fetching and obtaining bio pages.
+    * Added `TwitterThread` which represents a tweet thread page.
+* Added `TweetExtractor` which attempts to fetch all available Tweets on a page.
+* Added `Scroller` which abstracts away scrolling metrics.
+* Added thread expansion functions: `hit_more_replies()` and `get_recommend_tweets_height()`.
+* Changed random messages from ChromeDriver, makes logs cleaner.
+* Fixed potential for some posts to be skipped on ad removal.
+* Fixed logger not outputting any info.
+* Fixed logger not printing debug.
+
 ## 0.5.0: Supporting Our Community
 
 * Added modularization of code in `src/`.

@@ -18,7 +18,8 @@ sys.path.append(SRC_ROOT)
 import tb_watcher.swag as swag
 
 from tb_watcher.core import fetch_html
-from tb_watcher.logger import logger 
+from tb_watcher.logger import logger
+from tb_watcher.driver_utils import create_chrome_driver
 from tb_watcher.math_utils import calc_average_percentile, window_average, constant
 
 # selenium
@@ -30,11 +31,23 @@ from webdriver_manager.chrome import ChromeDriverManager
 def parse_args():
     parser = argparse.ArgumentParser(description="Twitter Bird Watcher. Taking a snapshot of a Twitter Profile.")
 
+    default_cpu_count = os.cpu_count()
+    if default_cpu_count >= 4:
+        default_cpu_count = 4
+    else:
+        default_cpu_count = min(os.cpu_count() - 1, 1)
+
     runtime_group = parser.add_argument_group("runtime states")
     runtime_group.add_argument("--force", "-f", help="Force re-download everything. WARNING, will delete outputs.", action="store_true")
     runtime_group.add_argument("--posts", "-p", help="Max number of posts to screenshot.", default=20, type=int)
     runtime_group.add_argument("--bio-only", "-b", help="Only store bio, no snapshots of tweets.", action="store_true")
     runtime_group.add_argument("--debug", help="Print debug output.", action="store_true")
+    runtime_group.add_argument("--multi-threading", "-t", help="Number of threads to spawn.", type=int, default=default_cpu_count)
+    runtime_group.add_argument("--depth", "-d", default=1, type=int, help=("How deep to follow threads on Twitter."
+                                                                           "1 means only main threads on profile."
+                                                                           "2 means threads including responses on each tweet on profile."
+                                                                           "3 means threads of threads. So-on and so-forth."
+                                                                           "Note that duplicates will occur for >= 3."))
 
     verification_group = parser.add_argument_group("verification")
     verification_group.add_argument("--login", help="Prompt user login to remove limits / default filters. USE AT OWN RISK.", action="store_true")
@@ -60,6 +73,7 @@ def main():
     print(swag.LOGO)
     print(swag.TITLE)
 
+    logger.info("Initializing...")
     # Create output folder if DNE.
     os.makedirs(args.output_fpath, exist_ok=True)
 
@@ -67,8 +81,21 @@ def main():
         "force": args.force,
         "bio_only": args.bio_only,
         "load_times": args.scroll_load_time,
-        "number_posts_to_cap": args.posts
+        "number_posts_to_cap": args.posts,
+        "fetch_threads": args.depth,
+        "num_threads": args.multi_threading
     }
+
+    assert args.depth >= 1, "You have to have atleast 1 depth in thread archiving."
+    assert (args.multi_threading == 1) or (args.multi_threading > 1 and not args.login), "Login feature only works on single thread."
+
+    args.output_fpath = args.output_fpath.strip()
+
+    if args.debug:
+        logger.setLevel(logger.DEBUG)
+        logger.debug("Debug mode set.")
+
+    logger.debug("CLI Parsed: {}".format(extra_args))
 
     # Select a scrolling algorithm before starting any drivers.
     f = None
@@ -82,13 +109,14 @@ def main():
 
     extra_args["offset_func"] = f
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    driver = create_chrome_driver()
     if args.login:
         driver.get("https://twitter.com/login")
         input("Please logging then press any key in CLI to continue...")
 
     data = []
     if args.url:
+        logger.info("Watching: {}".format(args.url))
         fetch_html(driver, args.url, fpath=args.output_fpath, **extra_args)
     else:
         weird_opening = "window\..* = (\[[\S\s]*)"
@@ -101,12 +129,14 @@ def main():
 
             # Remove the first line metadata
             data = json.loads(txt)
-    
+
         for d in data:
             account = d["following"]
-            fetch_html(driver, account["userLink"], fpath=args.output_fpath, **extra_args)
+            url = account["userLink"]
+            logger.info("Watching: {}".format(url))
+            fetch_html(driver, url, fpath=args.output_fpath, **extra_args)
 
-    logger.info("ALL SCRAPING COMPLETED!")
+    logger.info("ALL SNAPSHOTS COMPLETED!")
 
 if __name__ == "__main__":
     main()
